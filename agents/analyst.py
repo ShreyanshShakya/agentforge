@@ -19,6 +19,7 @@ Output ONLY:
 
 Do not discuss architecture.
 Do not create implementation plans.
-Maximum 200 words.
-"""
+Be complete and detailed.
+""",
+num_predict=500
         )

@@ -22,6 +22,7 @@ Output ONLY:
 5. Recommendations
 
 Do not redesign the system.
-Maximum 200 words.
-"""
+Be complete and Detailed.
+""",
+num_predict=500
         )

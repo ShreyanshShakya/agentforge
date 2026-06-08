@@ -1,0 +1,7 @@
+fastapi[all]
+sqlalchemy
+pyjwt
+passlib
+python-dotenv
+psycopg2-binary
+uvicorn

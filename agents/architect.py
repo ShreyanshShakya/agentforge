@@ -22,6 +22,7 @@ Output ONLY:
 
 Do not rewrite requirements.
 Do not create implementation tasks.
-Maximum 250 words.
-"""
+Be complete and detailed.
+""",
+num_predict=700
         )

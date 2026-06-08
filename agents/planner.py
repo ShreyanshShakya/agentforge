@@ -34,6 +34,7 @@ For each task provide:
 Do not discuss architecture.
 Do not discuss requirements.
 
-Maximum 600 words.
-"""
+Be complete and detailed.
+""",
+num_predict=1200
         )

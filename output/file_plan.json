@@ -1,0 +1,41 @@
+{
+  "project_name": "todo-api",
+  "files": [
+    {
+      "path": "requirements.txt",
+      "description": "Python dependencies"
+    },
+    {
+      "path": "app/main.py",
+      "description": "FastAPI entrypoint"
+    },
+    {
+      "path": "config/settings.py",
+      "description": "Configuration settings for FastAPI and SQLAlchemy"
+    },
+    {
+      "path": "database/models.py",
+      "description": "SQLAlchemy models for todos and users"
+    },
+    {
+      "path": "database/sessionmaker.py",
+      "description": "Session factory for database connections using SQLAlchemy"
+    },
+    {
+      "path": "services/todos.py",
+      "description": "Service layer for CRUD operations on todos"
+    },
+    {
+      "path": "services/users.py",
+      "description": "Service layer for user management (including registration and login)"
+    },
+    {
+      "path": "security/jwt_middleware.py",
+      "description": "JWT middleware to validate requests and generate tokens"
+    },
+    {
+      "path": "app/routes.py",
+      "description": "Routing configuration for FastAPI endpoints"
+    }
+  ]
+}
