@@ -29,7 +29,11 @@ Example:
     },
     {
       "path": "app/main.py",
-      "description": "FastAPI entrypoint"
+      "description": "FastAPI application entrypoint",
+      "depends_on": [
+        "app/auth/routers/login.py",
+        "app/todos/routers/v1/todos.py"
+      ]
     }
   ]
 }
