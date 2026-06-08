@@ -27,7 +27,7 @@ class BaseAgent:
                   "num_predict": self.num_predict
               }
          )
-        elapsed = time.time()
-        print(f"{self.name} took" f"{elapsed:.2f} sec")
+        elapsed = time.time() - start
+        print(f"{self.name} took " f"{elapsed:.2f} sec")
 
         return response["message"]["content"]
