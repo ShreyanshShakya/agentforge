@@ -9,6 +9,7 @@ from utils.json_parser import parse_json
 from agents.validator import ValidatorAgent
 from agents.fixer import FixerAgent
 from utils.compiler import check_python_file
+from agents.import_validator import ImportValidatorAgent
 import os
 import re
 
@@ -27,6 +28,7 @@ coder = CoderAgent()
 file_planner = FilePlannerAgent()
 validator = ValidatorAgent()
 fixer = FixerAgent()
+import_validator = ImportValidatorAgent()
 
 # Run workflow
 analysis = analyst.run(task)
@@ -229,10 +231,14 @@ GENERATED CODE:
         f.write(validated_code)
 
     if path.endswith(".py"):
-
-        is_valid, error = check_python_file(
-            full_path
-        )
+        is_valid, error = check_python_file(full_path)
+        if is_valid:
+            import_errors = import_validator.run(
+                f"PROJECT STRUCTURE\n\n{project_structure}\n\nFILE\n\n{path}\n\nCODE\n\n{validated_code}"
+            )
+            if "VALID" not in import_errors:
+                is_valid = False
+                error = f"Import Validation Failed:\n{import_errors}"
 
     else:
 
@@ -247,8 +253,15 @@ GENERATED CODE:
             is_valid, error = check_python_file(full_path)
 
             if is_valid:
-                print(f"✓ Passed: {path}")
-                break
+                import_errors = import_validator.run(
+                    f"PROJECT STRUCTURE\n\n{project_structure}\n\nFILE\n\n{path}\n\nCODE\n\n{validated_code}"
+                )
+                if "VALID" in import_errors:
+                    print(f"✓ Passed: {path}")
+                    break
+                else:
+                    is_valid = False
+                    error = f"Import Validation Failed:\n{import_errors}"
 
             print(f"Fix attempt {attempt + 1} for {path}")
 
@@ -299,6 +312,8 @@ Return only corrected file content.
             print(f"✓ Passed successfully after fixes: {path}")
         else:
             print(f" Still failing after {MAX_RETRIES} attempts: {path}")
+
+
 
     print(
         f"Created: {full_path}"
