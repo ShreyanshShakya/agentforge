@@ -1,0 +1,4 @@
+  File "output/project/config/config.py", line 1
+    ```python
+    ^
+SyntaxError: invalid syntax

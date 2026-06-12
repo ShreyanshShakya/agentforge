@@ -1,0 +1,243 @@
+import pytest
+from sqlalchemy.orm import Session
+from unittest.mock import patch
+
+from config.database import engine, SessionLocal, Base
+
+# Mocking the database session for unit testing
+@pytest.fixture(scope="function")
+def db_session():
+    """Create a mock database session."""
+    with SessionLocal() as session:
+        yield session
+
+# Mocking the create_engine and sessionmaker functions to avoid actual DB connection
+@patch('sqlalchemy.create_engine')
+@patch('sqlalchemy.orm.sessionmaker')
+def test_database_config(create_engine_mock, sessionmaker_mock):
+    """Test database configuration."""
+    # Check if create_engine is called with correct URL
+    create_engine_mock.assert_called_once_with(DATABASE_URL)
+    
+    # Check if sessionmaker is correctly initialized
+    assert sessionmaker_mock.call_args[0][0] == engine
+    
+    # Check if SessionLocal is an instance of sessionmaker
+    assert isinstance(SessionLocal, sessionmaker)
+
+# Mocking the Base for declarative classes
+class Todo(Base):
+    __tablename__ = "todos"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String, index=True)
+    description = Column(String, index=True)
+    due_date = Column(DateTime)
+    completed = Column(Boolean, default=False)
+
+# Test for creating a new Todo item
+def test_create_todo(db_session):
+    """Test creating a new todo item."""
+    todo_data = {
+        "title": "Buy groceries",
+        "description": "Milk, eggs, bread, cheese.",
+        "due_date": "2023-10-15T18:00:00Z"
+    }
+    
+    with db_session:
+        new_todo = Todo(**todo_data)
+        db_session.add(new_todo)
+        db_session.commit()
+        db_session.refresh(new_todo)
+        
+        assert new_todo.id is not None
+        assert new_todo.title == "Buy groceries"
+        assert new_todo.description == "Milk, eggs, bread, cheese."
+        assert new_todo.due_date == todo_data["due_date"]
+        assert new_todo.completed == False
+
+# Test for retrieving a Todo item
+def test_get_todo(db_session):
+    """Test retrieving a todo item."""
+    with db_session:
+        # Create a test todo to retrieve
+        test_todo = Todo(title="Buy groceries", description="Milk, eggs, bread, cheese.", due_date="2023-10-15T18:00:00Z")
+        db_session.add(test_todo)
+        db_session.commit()
+        db_session.refresh(test_todo)
+        
+        # Retrieve the todo
+        retrieved_todo = db_session.query(Todo).filter_by(id=test_todo.id).first()
+        
+        assert retrieved_todo is not None
+        assert retrieved_todo.title == "Buy groceries"
+        assert retrieved_todo.description == "Milk, eggs, bread, cheese."
+        assert retrieved_todo.due_date == test_todo.due_date
+        assert retrieved_todo.completed == False
+
+# Test for updating a Todo item
+def test_update_todo(db_session):
+    """Test updating a todo item."""
+    with db_session:
+        # Create a test todo to update
+        test_todo = Todo(title="Buy groceries", description="Milk, eggs, bread, cheese.", due_date="2023-10-15T18:00:00Z")
+        db_session.add(test_todo)
+        db_session.commit()
+        db_session.refresh(test_todo)
+        
+        # Update the todo
+        test_todo.title = "Buy vegetables"
+        db_session.commit()
+        updated_todo = db_session.query(Todo).filter_by(id=test_todo.id).first()
+        
+        assert updated_todo is not None
+        assert updated_todo.title == "Buy vegetables"
+        assert updated_todo.description == "Milk, eggs, bread, cheese."
+        assert updated_todo.due_date == test_todo.due_date
+        assert updated_todo.completed == False
+
+# Test for deleting a Todo item
+def test_delete_todo(db_session):
+    """Test deleting a todo item."""
+    with db_session:
+        # Create a test todo to delete
+        test_todo = Todo(title="Buy groceries", description="Milk, eggs, bread, cheese.", due_date="2023-10-15T18:00:00Z")
+        db_session.add(test_todo)
+        db_session.commit()
+        db_session.refresh(test_todo)
+        
+        # Delete the todo
+        db_session.delete(test_todo)
+        db_session.commit()
+        
+        deleted_todo = db_session.query(Todo).filter_by(id=test_todo.id).first()
+        assert deleted_todo is None
+
+# Test for searching todos by title
+def test_search_todos_by_title(db_session):
+    """Test searching todos by title."""
+    with db_session:
+        # Create test todos to search
+        todo1 = Todo(title="Buy groceries", description="Milk, eggs, bread, cheese.", due_date="2023-10-15T18:00:00Z")
+        todo2 = Todo(title="Clean the house", description="Dust, vacuum, mop.", due_date="2023-10-16T18:00:00Z")
+        db_session.add(todo1)
+        db_session.add(todo2)
+        db_session.commit()
+        db_session.refresh(todo1)
+        db_session.refresh(todo2)
+        
+        # Search todos by title
+        search_term = "Buy"
+        search_results = db_session.query(Todo).filter(Todo.title.contains(search_term)).all()
+        
+        assert len(search_results) == 1
+        assert search_results[0].title == "Buy groceries"
+
+# Test for searching todos by description
+def test_search_todos_by_description(db_session):
+    """Test searching todos by description."""
+    with db_session:
+        # Create test todos to search
+        todo1 = Todo(title="Buy groceries", description="Milk, eggs, bread, cheese.", due_date="2023-10-15T18:00:00Z")
+        todo2 = Todo(title="Clean the house", description="Dust, vacuum, mop.", due_date="2023-10-16T18:00:00Z")
+        db_session.add(todo1)
+        db_session.add(todo2)
+        db_session.commit()
+        db_session.refresh(todo1)
+        db_session.refresh(todo2)
+        
+        # Search todos by description
+        search_term = "milk"
+        search_results = db_session.query(Todo).filter(Todo.description.contains(search_term)).all()
+        
+        assert len(search_results) == 1
+        assert search_results[0].title == "Buy groceries"
+
+# Test for searching todos by due date range
+def test_search_todos_by_due_date_range(db_session):
+    """Test searching todos by due date range."""
+    with db_session:
+        # Create test todos to search
+        todo1 = Todo(title="Buy groceries", description="Milk, eggs, bread, cheese.", due_date="2023-10-15T18:00:00Z")
+        todo2 = Todo(title="Clean the house", description="Dust, vacuum, mop.", due_date="2023-10-16T18:00:00Z")
+        db_session.add(todo1)
+        db_session.add(todo2)
+        db_session.commit()
+        db_session.refresh(todo1)
+        db_session.refresh(todo2)
+        
+        # Search todos by due date range
+        start_date = "2023-10-15T18:00:00Z"
+        end_date = "2023-10-16T18:00:00Z"
+        search_results = db_session.query(Todo).filter(
+            Todo.due_date.between(start_date, end_date)
+        ).all()
+        
+        assert len(search_results) == 2
+        assert search_results[0].title == "Buy groceries"
+        assert search_results[1].title == "Clean the house"
+
+# Test for searching todos by keywords
+def test_search_todos_by_keywords(db_session):
+    """Test searching todos by keywords."""
+    with db_session:
+        # Create test todos to search
+        todo1 = Todo(title="Buy groceries", description="Milk, eggs, bread, cheese.", due_date="2023-10-15T18:00:00Z")
+        todo2 = Todo(title="Clean the house", description="Dust, vacuum, mop.", due_date="2023-10-16T18:00:00Z")
+        db_session.add(todo1)
+        db_session.add(todo2)
+        db_session.commit()
+        db_session.refresh(todo1)
+        db_session.refresh(todo2)
+        
+        # Search todos by keywords
+        search_term = "milk"
+        search_results = db_session.query(Todo).filter(
+            Todo.description.contains(search_term) | Todo.title.contains(search_term)
+        ).all()
+        
+        assert len(search_results) == 1
+        assert search_results[0].title == "Buy groceries"
+
+# Test for updating a todo with completed status
+def test_update_todo_completed_status(db_session):
+    """Test updating a todo's completed status."""
+    with db_session:
+        # Create a test todo to update
+        test_todo = Todo(title="Buy groceries", description="Milk, eggs, bread, cheese.", due_date="2023-10-15T18:00:00Z")
+        db_session.add(test_todo)
+        db_session.commit()
+        db_session.refresh(test_todo)
+        
+        # Update the todo's completed status
+        test_todo.completed = True
+        db_session.commit()
+        updated_todo = db_session.query(Todo).filter_by(id=test_todo.id).first()
+        
+        assert updated_todo is not None
+        assert updated_todo.title == "Buy groceries"
+        assert updated_todo.description == "Milk, eggs, bread, cheese."
+        assert updated_todo.due_date == test_todo.due_date
+        assert updated_todo.completed == True
+
+# Test for updating a todo with reminders disabled
+def test_update_todo_reminders_disabled(db_session):
+    """Test updating a todo's reminders status."""
+    # Assuming there's a column 'reminders_enabled' in Todo model to handle reminders
+    with db_session:
+        # Create a test todo to update
+        test_todo = Todo(title="Buy groceries", description="Milk, eggs, bread, cheese.", due_date="2023-10-15T18:00:00Z")
+        db_session.add(test_todo)
+        db_session.commit()
+        db_session.refresh(test_todo)
+        
+        # Update the todo's reminders status
+        test_todo.reminders_enabled = False  # Assuming 'reminders_enabled' is a column in Todo model
+        db_session.commit()
+        updated_todo = db_session.query(Todo).filter_by(id=test_todo.id).first()
+        
+        assert updated_todo is not None
+        assert updated_todo.title == "Buy groceries"
+        assert updated_todo.description == "Milk, eggs, bread, cheese."
+        assert updated_todo.due_date == test_todo.due_date
+        assert updated_todo.reminders_enabled == False  # Assuming 'reminders_enabled' is a column in Todo model

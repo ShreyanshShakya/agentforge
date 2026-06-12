@@ -1,0 +1,37 @@
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from typing import List
+
+from app.admin.schemas import UserSchema, UserUpdateSchema
+from app.admin.services import user_service
+from app.dependencies import get_db, get_current_admin
+
+router = APIRouter()
+
+@router.get("/users/", response_model=List[UserSchema])
+async def read_users(db: Session = Depends(get_db), current_user: str = Depends(get_current_admin)):
+    users = await user_service.get_all_users(db)
+    return users
+
+@router.get("/users/{user_id}", response_model=UserSchema)
+async def read_user(user_id: int, db: Session = Depends(get_db), current_user: str = Depends(get_current_admin)):
+    user = await user_service.get_user_by_id(db, user_id=user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
+
+@router.put("/users/{user_id}", response_model=UserSchema)
+async def update_user(user_id: int, user_update: UserUpdateSchema, db: Session = Depends(get_db), current_user: str = Depends(get_current_admin)):
+    user = await user_service.get_user_by_id(db, user_id=user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    updated_user = await user_service.update_user(db, db_obj=user, obj_in=user_update)
+    return updated_user
+
+@router.delete("/users/{user_id}", response_model=UserSchema)
+async def delete_user(user_id: int, db: Session = Depends(get_db), current_user: str = Depends(get_current_admin)):
+    user = await user_service.get_user_by_id(db, user_id=user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    deleted_user = await user_service.remove_user(db, db_obj=user)
+    return deleted_user

@@ -1,0 +1,50 @@
+import pytest
+from unittest.mock import MagicMock, patch
+from app.notification.schemas import Reminder, NotificationResponse
+
+def test_reminder_schema():
+    data = {
+        "user_id": 1,
+        "todo_id": 2,
+        "reminder_date": "2023-10-01",
+        "enabled": True
+    }
+    reminder = Reminder(**data)
+    assert reminder.user_id == 1
+    assert reminder.todo_id == 2
+    assert reminder.reminder_date == "2023-10-01"
+    assert reminder.enabled is True
+
+def test_notification_response_schema():
+    data = {
+        "message": "Reminder sent successfully"
+    }
+    response = NotificationResponse(**data)
+    assert response.message == "Reminder sent successfully"
+
+@patch('app.notification.schemas.send_reminder')
+def test_send_reminder(mock_send_reminder):
+    reminder_data = {
+        "user_id": 1,
+        "todo_id": 2,
+        "reminder_date": "2023-10-01",
+        "enabled": True
+    }
+    reminder = Reminder(**reminder_data)
+    mock_send_reminder.return_value = {"status": "success"}
+    
+    result = reminder.send_reminder()
+    assert result == {"status": "success"}
+    mock_send_reminder.assert_called_once_with(reminder)
+
+@patch('app.notification.schemas.NotificationResponse')
+def test_notification_response(mock_response):
+    data = {
+        "message": "Reminder sent successfully"
+    }
+    notification = NotificationResponse(**data)
+    
+    with pytest.raises(ValueError) as exc_info:
+        notification.message = None
+    
+    assert str(exc_info.value) == 'message cannot be None'

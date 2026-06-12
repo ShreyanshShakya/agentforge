@@ -1,0 +1,50 @@
+```python
+import pytest
+from fastapi.security import JWTBearer
+from config.jwt import SECRET_KEY, ALGORITHM
+
+@pytest.fixture
+def jwt_bearer():
+    return JWTBearer()
+
+def test_secret_key_and_algorithm(jwt_bearer):
+    assert SECRET_KEY != 'your_secret_key_here'
+    assert ALGORITHM == "HS256"
+
+def test_jwt_token_verification(jwt_bearer):
+    try:
+        encoded_jwt = jwt_bearer.get_token_prefix_and_credentials("Bearer your_access_token_here")
+        assert encoded_jwt is not None
+    except ValueError as e:
+        pytest.fail(f"JWT token verification failed: {e}")
+
+def test_secret_key_env_variable():
+    os.environ['JWT_SECRET_KEY'] = 'new_secret_key'
+    from config.jwt import SECRET_KEY
+    assert SECRET_KEY == 'new_secret_key'
+
+def test_algorithm_env_variable():
+    os.environ['ALGORITHM'] = "HS512"
+    from config.jwt import ALGORITHM
+    assert ALGORITHM == "HS512"
+
+def test_missing_environment_variables(capsys):
+    os.environ.pop('JWT_SECRET_KEY', None)
+    try:
+        from config.jwt import SECRET_KEY
+    except Exception as e:
+        pytest.fail(f"Missing environment variable: {e}")
+    
+    captured = capsys.readouterr()
+    assert "JWT_SECRET_KEY" in captured.err
+
+def test_invalid_algorithm(capsys):
+    os.environ['ALGORITHM'] = "HS256"
+    try:
+        from config.jwt import ALGORITHM
+    except Exception as e:
+        pytest.fail(f"Invalid algorithm: {e}")
+    
+    captured = capsys.readouterr()
+    assert "Invalid algorithm" in captured.err
+```

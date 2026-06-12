@@ -1,0 +1,48 @@
+{
+  "project_name": "todo-api",
+  "files": [
+    {
+      "path": "requirements.txt",
+      "description": "Python dependencies"
+    },
+    {
+      "path": "app/auth/routers/login.py",
+      "description": "User authentication routes implementation"
+    },
+    {
+      "path": "app/todos/routers/v1/todos.py",
+      "description": "Todo CRUD operations endpoints"
+    },
+    {
+      "path": "app/search/queries.py",
+      "description": "Search functionality implementation"
+    },
+    {
+      "path": "app/notification/schemas.py",
+      "description": "Notification schema definitions and logic"
+    },
+    {
+      "path": "app/admin/routers/admin.py",
+      "description": "Admin management endpoints"
+    },
+    {
+      "path": "config/database.py",
+      "description": "Database configuration"
+    },
+    {
+      "path": "config/jwt.py",
+      "description": "JWT token and secret configuration"
+    },
+    {
+      "path": "app/main.py",
+      "description": "FastAPI application entrypoint",
+      "depends_on": [
+        "app/auth/routers/login.py",
+        "app/todos/routers/v1/todos.py",
+        "app/search/queries.py",
+        "app/notification/schemas.py",
+        "app/admin/routers/admin.py"
+      ]
+    }
+  ]
+}

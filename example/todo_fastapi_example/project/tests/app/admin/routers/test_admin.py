@@ -1,0 +1,79 @@
+import pytest
+from unittest.mock import patch
+
+from app.admin.schemas import UserSchema, UserUpdateSchema
+from app.dependencies import get_db
+from app.admin.routers.admin import read_users, read_user, update_user, delete_user
+from app.admin.services import user_service
+
+@pytest.fixture()
+def mock_user_service():
+    with patch('app.admin.services.user_service.get_all_users') as mock_get_all:
+        yield mock_get_all
+
+@pytest.fixture()
+def mock_user_service_by_id():
+    with patch('app.admin.services.user_service.get_user_by_id') as mock_get_by_id:
+        yield mock_get_by_id
+
+@pytest.fixture()
+def mock_user_service_update():
+    with patch('app.admin.services.user_service.update_user') as mock_update:
+        yield mock_update
+
+@pytest.fixture()
+def mock_user_service_delete():
+    with patch('app.admin.services.user_service.remove_user') as mock_delete:
+        yield mock_delete
+
+@pytest.fixture()
+def mock_db():
+    return mock.Mock(spec=Session)
+
+async def test_read_users(mock_user_service, mock_db):
+    users = [UserSchema(id=1), UserSchema(id=2)]
+    mock_user_service.return_value = users
+    response = await read_users(db=mock_db)
+    assert response == users
+
+async def test_read_user_found(mock_user_service_by_id, mock_db):
+    user = UserSchema(id=1)
+    mock_user_service_by_id.return_value = user
+    response = await read_user(user_id=1, db=mock_db)
+    assert response == user
+
+async def test_read_user_not_found(mock_user_service_by_id, mock_db):
+    mock_user_service_by_id.return_value = None
+    with pytest.raises(HTTPException) as exc_info:
+        await read_user(user_id=1, db=mock_db)
+    assert exc_info.value.status_code == 404
+    assert exc_info.value.detail == "User not found"
+
+async def test_update_user_found(mock_user_service_by_id, mock_user_service_update, mock_db):
+    user = UserSchema(id=1)
+    mock_user_service_by_id.return_value = user
+    updated_user_data = UserUpdateSchema(username="new_username")
+    mock_user_service_update.return_value = UserSchema(id=1, username="new_username")
+    response = await update_user(user_id=1, user_update=updated_user_data, db=mock_db)
+    assert response == UserSchema(id=1, username="new_username")
+
+async def test_update_user_not_found(mock_user_service_by_id, mock_db):
+    mock_user_service_by_id.return_value = None
+    with pytest.raises(HTTPException) as exc_info:
+        await update_user(user_id=1, user_update=UserUpdateSchema(username="new_username"), db=mock_db)
+    assert exc_info.value.status_code == 404
+    assert exc_info.value.detail == "User not found"
+
+async def test_delete_user_found(mock_user_service_by_id, mock_user_service_delete, mock_db):
+    user = UserSchema(id=1)
+    mock_user_service_by_id.return_value = user
+    mock_user_service_delete.return_value = UserSchema(id=1)
+    response = await delete_user(user_id=1, db=mock_db)
+    assert response == UserSchema(id=1)
+
+async def test_delete_user_not_found(mock_user_service_by_id, mock_db):
+    mock_user_service_by_id.return_value = None
+    with pytest.raises(HTTPException) as exc_info:
+        await delete_user(user_id=1, db=mock_db)
+    assert exc_info.value.status_code == 404
+    assert exc_info.value.detail == "User not found"

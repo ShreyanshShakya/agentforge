@@ -1,0 +1,4 @@
+  File "output/project/app/utils/json_encoder.py", line 1
+    ```python
+    ^
+SyntaxError: invalid syntax

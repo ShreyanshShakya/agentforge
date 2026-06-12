@@ -1,0 +1,4 @@
+  File "output/project/middlewares/rate_limiting_middleware.py", line 1
+    ```python
+    ^
+SyntaxError: invalid syntax

@@ -1,0 +1,165 @@
+```python
+# Todo API with FastAPI and PostgreSQL
+
+This project is a RESTful API built using FastAPI for managing todo items. It includes user authentication, CRUD operations for todos, search functionality, notification system, and an admin management dashboard.
+
+## Installation
+
+1. Clone the repository:
+      git clone https://github.com/yourusername/todo-api.git
+   cd todo-api
+   
+2. Create a virtual environment and activate it:
+      python -m venv venv
+   source venv/bin/activate  # On Windows use `venv\Scripts\activate`
+   
+3. Install dependencies:
+      pip install -r requirements.txt
+   
+4. Create a `.env` file and configure the necessary environment variables.
+
+5. Initialize the database:
+      alembic upgrade head
+   
+6. Run the application:
+      uvicorn main:app --reload
+   
+## Usage
+
+### User Authentication
+
+- **Register**: `POST /api/auth/register`
+  - Request Body: `{ "email": "user@example.com", "password": "password" }`
+
+- **Login**: `POST /api/auth/login`
+  - Request Body: `{ "email": "user@example.com", "password": "password" }`
+  - Response: JWT token
+
+### Todo CRUD Operations
+
+- **Create Todo**: `POST /api/todos`
+  - Request Body: `{ "title": "Task Title", "description": "Task Description", "due_date": "2023-12-31T23:59:59Z" }`
+
+- **Get Todos**: `GET /api/todos`
+  - Query Parameters: `title`, `description`, `due_date_start`, `due_date_end`, `keywords`
+
+- **Update Todo**: `PUT /api/todos/{id}`
+  - Request Body: `{ "title": "Updated Title", "description": "Updated Description", "due_date": "2023-12-31T23:59:59Z" }`
+
+- **Delete Todo**: `DELETE /api/todos/{id}`
+
+### Admin Management
+
+- **List Users**: `GET /api/admin/users`
+  - Admin-only endpoint
+
+## API Documentation
+
+You can access the interactive API documentation at:
+http://localhost:8000/docs
+
+
+
+from fastapi import FastAPI, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+from passlib.context import CryptContext
+from jose import JWTError, jwt
+from datetime import datetime, timedelta
+import schemas
+import models
+from database import engine, get_db
+from config import SECRET_KEY, ALGORITHM
+
+models.Base.metadata.create_all(bind=engine)
+
+app = FastAPI()
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# Dependency to authenticate and return current user
+def get_current_user(db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        if email is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+    user = db.query(models.User).filter(models.User.email == email).first()
+    if user is None:
+        raise credentials_exception
+    return user
+
+# Dependency to check if current user is admin
+def get_current_admin_user(current_user: schemas.User = Depends(get_current_user)):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Not enough permissions")
+    return current_user
+
+@app.post("/api/auth/register", response_model=schemas.User)
+async def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
+    hashed_password = pwd_context.hash(user.password)
+    db_user = models.User(email=user.email, password=hashed_password, is_admin=False)
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    return db_user
+
+@app.post("/api/auth/login", response_model=schemas.Token)
+async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    user = authenticate_user(db, form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(data={"sub": user.email}, expires_delta=access_token_expires)
+    return {"access_token": access_token, "token_type": "bearer"}
+
+# Dummy authenticate_user function for demonstration
+def authenticate_user(db: Session, username: str, password: str):
+    user = db.query(models.User).filter(models.User.email == username).first()
+    if not user:
+        return False
+    if not pwd_context.verify(password, user.password):
+        return False
+    return user
+
+# Dummy create_access_token function for demonstration
+def create_access_token(data: dict, expires_delta: timedelta = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=15)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+@app.get("/api/todos", response_model=list[schemas.Todo])
+async def get_todos(current_user: schemas.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    todos = db.query(models.Todo).filter_by(user_id=current_user.id).all()
+    return todos
+
+# Other endpoints for CRUD operations and admin management can be added here
+
+
+
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key")
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+
+# Other configuration variables can be added here
+```

@@ -1,0 +1,4 @@
+  File "output/project/app/utils/hashers/bcrypt.py", line 1
+    ```python
+    ^
+SyntaxError: invalid syntax

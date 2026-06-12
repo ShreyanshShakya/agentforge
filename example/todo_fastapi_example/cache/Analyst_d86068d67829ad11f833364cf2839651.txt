@@ -1,0 +1,45 @@
+1. Objectives:
+   - Create a RESTful API using FastAPI that allows users to manage todo items (create, read, update, delete).
+   - Implement an authentication system for user authorization.
+   - Design the database schema and ensure data integrity.
+   - Ensure the API is scalable, secure, and easy to maintain.
+
+2. Functional Requirements:
+   a. **User Authentication:**
+      - Users should be able to register with their email and password.
+      - Users can log in using their credentials.
+      - Sessions are managed securely (e.g., JWT tokens).
+
+   b. **Todo CRUD Operations:**
+      - Users should be able to create new todo items by providing a title, description, due date, and priority level.
+      - Users should be able to read all of their existing todo items.
+      - Users should have the ability to update existing todo items with new details or status (e.g., completed).
+      - Users should be able to delete specific todo items from their list.
+
+   c. **Search Functionality:**
+      - Users can search for todos by title, description, due date range, and keyword within titles and descriptions.
+
+   d. **Notification System:**
+      - A reminder system that sends notifications when a user has a task approaching its due date.
+      - Option to enable/disable reminders per todo item.
+
+   e. **Admin Management:**
+      - An admin role for managing all users (viewing, updating, deleting).
+      - Admins can manage the database schema and data directly through the API.
+      - Admins should have a separate dashboard that provides an overview of user activities, completed tasks, etc.
+
+3. Non-Functional Requirements:
+   a. **Performance:**
+      - Ensure CRUD operations are handled within acceptable response times (e.g., < 500ms for most requests).
+      - Implement caching mechanisms to improve performance.
+      - Handle high traffic loads by ensuring the system is scalable and can handle multiple concurrent connections.
+
+   b. **Security:**
+      - Use HTTPS to secure data transmission between client and server.
+      - Implement proper validation checks (e.g., length, format) for all input fields.
+      - Protect against SQL injection attacks through parameterized queries or ORM-based models.
+      - Secure sensitive information (e.g., passwords) using encryption.
+
+   c. **Reliability:**
+      - Design a backup strategy to ensure data recovery in case of system failure.
+      - Use

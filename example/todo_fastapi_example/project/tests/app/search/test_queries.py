@@ -1,0 +1,107 @@
+import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine, Column, Integer, String, ForeignKey
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import relationship, sessionmaker
+from pydantic import BaseModel
+from app.search.queries import get_current_user, get_current_admin_user
+
+# Mocking database models and dependencies for testing
+Base = declarative_base()
+
+class User(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True)
+    email = Column(String, unique=True, index=True)
+    password = Column(String)
+    is_admin = Column(Boolean, default=False)
+
+class Todo(Base):
+    __tablename__ = "todos"
+    id = Column(Integer, primary_key=True)
+    title = Column(String)
+    description = Column(String)
+    due_date = Column(DateTime)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    user = relationship("User")
+
+engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
+Base.metadata.create_all(bind=engine)
+TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+class MockDepends:
+    def __init__(self, user):
+        self.user = user
+
+    def __call__(self, *args, **kwargs):
+        return self.user
+
+@pytest.fixture
+def test_client():
+    client = TestClient(app)
+    yield client
+
+@pytest.fixture
+def mock_db():
+    db = TestingSessionLocal()
+    yield db
+    db.close()
+
+@pytest.fixture
+def mock_user():
+    user_data = {
+        "email": "testuser@example.com",
+        "password": "securepassword123"
+    }
+    return User(email=user_data["email"], password=user_data["password"])
+
+@pytest.fixture
+def mock_admin_user():
+    admin_data = {
+        "email": "adminuser@example.com",
+        "password": "secureadminpassword123",
+        "is_admin": True
+    }
+    return User(email=admin_data["email"], password=admin_data["password"], is_admin=admin_data["is_admin"])
+
+@pytest.fixture
+def mock_todo(mock_db, mock_user):
+    todo = Todo(title="Test Todo", description="This is a test todo item", due_date=datetime.now(), user_id=mock_user.id)
+    mock_db.add(todo)
+    mock_db.commit()
+    mock_db.refresh(todo)
+    return todo
+
+# Tests for authentication endpoints
+def test_register_user(test_client, mock_user):
+    response = test_client.post("/api/auth/register", json={"email": mock_user.email, "password": mock_user.password})
+    assert response.status_code == 200
+    user_data = response.json()
+    assert user_data["email"] == mock_user.email
+
+def test_login_for_access_token(test_client, mock_user):
+    response = test_client.post("/api/auth/login", data={"username": mock_user.email, "password": mock_user.password})
+    assert response.status_code == 200
+    token_data = response.json()
+    assert "access_token" in token_data
+
+# Tests for search functionality
+def test_get_todos(test_client, mock_db, mock_user, mock_todo):
+    response = test_client.get("/api/todos", headers={"Authorization": f"Bearer {create_access_token(data={'sub': mock_user.email'})}"})
+    assert response.status_code == 200
+    todos_data = response.json()
+    assert len(todos_data) == 1
+    assert todos_data[0]["title"] == mock_todo.title
+
+# Helper function to create JWT token for testing purposes
+def create_access_token(data: dict, expires_delta: timedelta = None):
+    SECRET_KEY = "your-secret-key"
+    ALGORITHM = "HS256"
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=15)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt

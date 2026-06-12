@@ -1,0 +1,18 @@
+```python
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+
+DATABASE_URL = "postgresql://user:password@localhost/dbname"
+
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+Base = declarative_base()
+
+# Create the test database file for pytest
+test_db_file = 'output/project/tests/config/test_database.db'
+test_engine = create_engine(f'sqlite:///{test_db_file}')
+TestSessionLocal = sessionmaker(bind=test_engine)
+Base.metadata.create_all(test_engine)
+```

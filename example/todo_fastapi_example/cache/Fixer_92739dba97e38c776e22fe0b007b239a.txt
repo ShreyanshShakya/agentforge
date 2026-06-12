@@ -1,0 +1,44 @@
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from typing import List
+
+from app.todos.schemas import TodoCreate, TodoUpdate
+from app.todos.service import todo_service
+from app.db.session import get_db
+from app.auth.service import current_user
+
+router = APIRouter()
+
+@router.post("/", response_model=Todo)
+def create_todo(todo: TodoCreate, db: Session = Depends(get_db), user=Depends(current_user)):
+    return todo_service.create_todo(db=db, todo=todo)
+
+@router.get("/{todo_id}", response_model=Todo)
+def read_todo(todo_id: int, db: Session = Depends(get_db), user=Depends(current_user)):
+    todo = todo_service.get_todo_by_id(db=db, todo_id=todo_id)
+    if not todo:
+        raise HTTPException(status_code=404, detail="Todo not found")
+    return todo
+
+@router.put("/{todo_id}", response_model=Todo)
+def update_todo(todo_id: int, todo_update: TodoUpdate, db: Session = Depends(get_db), user=Depends(current_user)):
+    todo = todo_service.get_todo_by_id(db=db, todo_id=todo_id)
+    if not todo:
+        raise HTTPException(status_code=404, detail="Todo not found")
+    return todo_service.update_todo(db=db, todo=todo_update, todo_id=todo_id)
+
+@router.delete("/{todo_id}", response_model=Todo)
+def delete_todo(todo_id: int, db: Session = Depends(get_db), user=Depends(current_user)):
+    todo = todo_service.get_todo_by_id(db=db, todo_id=todo_id)
+    if not todo:
+        raise HTTPException(status_code=404, detail="Todo not found")
+    return todo_service.delete_todo(db=db, todo_id=todo_id)
+
+@router.get("/", response_model=List[Todo])
+def read_todos(
+    skip: int = 0,
+    limit: int = 10,
+    db: Session = Depends(get_db),
+    user=Depends(current_user)
+):
+    return todo_service.get_todos(db=db, skip=skip, limit=limit)
