@@ -1,28 +1,55 @@
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
-from .database import get_db
-from .auth import authenticate_user, create_access_token
-from .models import User
+from app.auth.routers.login import authenticate_user
+from app.todos.routers.v1.todos import router as todos_router
+from app.search.queries import search_todos
+from app.notification.schemas import send_notification
+from app.admin.routers.admin import router as admin_router
+from app.database import get_db, create_tables
 
 app = FastAPI()
 
-@app.post("/auth/register")
-async def register(username: str, password: str, db: Session = Depends(get_db)):
-    user = db.query(User).filter_by(username=username).first()
-    if user:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already registered")
-    new_user = User(username=username, password=password)
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
-    return {"message": "User created successfully"}
+# Create tables on application startup
+@app.on_event("startup")
+async def startup():
+    await create_tables()
 
-@app.post("/auth/login")
-async def login(username: str, password: str):
-    user = authenticate_user(username, password)
+# Include routers
+app.include_router(todos_router)
+app.include_router(admin_router)
+
+# Example endpoint to authenticate a user
+@app.post("/token", response_model=LoginResponse)
+async def login_for_access_token(db: Session = Depends(get_db), form_data: OAuth2PasswordRequestForm = Depends()):
+    user = authenticate_user(db, form_data.username, form_data.password)
     if not user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
-                            detail="Could not validate credentials",
-                            headers={"WWW-Authenticate": "Bearer"})
-    access_token = create_access_token(data={"sub": user.username})
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.email}, expires_delta=access_token_expires
+    )
     return {"access_token": access_token, "token_type": "bearer"}
+
+# Example endpoint to search todos
+@app.get("/search/todos", response_model=SearchResponse)
+async def search_todo(query: str, db: Session = Depends(get_db)):
+    results = await search_todos(db, query)
+    return {"results": results}
+
+# Example endpoint to send a notification
+@app.post("/send-notification", status_code=status.HTTP_204_NO_CONTENT)
+async def send_notif(payload: NotificationSchema, db: Session = Depends(get_db)):
+    await send_notification(db, payload)
+
+# Add test file if missing
+import pytest
+
+@pytest.fixture(scope="module")
+def client():
+    from fastapi.testclient import TestClient
+    with TestClient(app) as client:
+        yield client

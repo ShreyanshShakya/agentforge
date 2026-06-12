@@ -10,8 +10,10 @@ from agents.validator import ValidatorAgent
 from agents.fixer import FixerAgent
 from utils.compiler import check_python_file
 from agents.import_validator import ImportValidatorAgent
+from agents.test_generator import TestGeneratorAgent
 import os
 import re
+import subprocess
 
 task = """
 Build a FastAPI Todo API.
@@ -26,9 +28,9 @@ planner = PlannerAgent()
 consensus = ConsensusAgent()
 coder = CoderAgent()
 file_planner = FilePlannerAgent()
-validator = ValidatorAgent()
 fixer = FixerAgent()
 import_validator = ImportValidatorAgent()
+test_generator = TestGeneratorAgent()
 
 # Run workflow
 analysis = analyst.run(task)
@@ -132,11 +134,42 @@ project_structure = "\n".join(
     ]
 )
 
+def run_test_pipeline(path, validated_code, context_structure, full_path, consensus_output, description):
+    if path.endswith("__init__.py") or path.endswith(".txt"):
+        return True, None, None
+
+    import_errors = import_validator.run(
+        f"PROJECT STRUCTURE\n\n{context_structure}\n\nFILE\n\n{path}\n\nCODE\n\n{validated_code}"
+    )
+    if "VALID" not in import_errors:
+        return False, f"Import Validation Failed:\n{import_errors}", "IMPORT_ERROR"
+    
+    test_file_path = full_path.replace("output/project/", "output/project/tests/")
+    test_dir = os.path.dirname(test_file_path)
+    os.makedirs(test_dir, exist_ok=True)
+    basename = os.path.basename(test_file_path)
+    if not basename.startswith("test_"):
+        test_file_path = os.path.join(test_dir, "test_" + basename)
+    
+    if not os.path.exists(test_file_path):
+        test_code = test_generator.run(f"CONSENSUS SPECIFICATION\n\n{consensus_output}\n\nPROJECT STRUCTURE\n\n{context_structure}\n\nFILE DESCRIPTION\n\n{description}\n\nFILE\n\n{path}\n\nCODE\n\n{validated_code}")
+        test_code = re.sub(r"```[a-zA-Z]*\n?", "", test_code)
+        test_code = re.sub(r"```\n?", "", test_code).strip()
+        with open(test_file_path, "w", encoding="utf-8") as f:
+            f.write(test_code)
+        
+    result = subprocess.run(["python", "-m", "pytest", test_file_path], capture_output=True, text=True, cwd="output/project")
+    if result.returncode != 0:
+        return False, f"Pytest Execution Failed:\n{result.stderr}\n{result.stdout}", "PYTEST_FAILURE"
+    return True, None, None
+
 for file_info in parsed_file_plan["files"]:
 
     path = file_info["path"]
-
     description = file_info["description"]
+
+    depends_on = file_info.get("depends_on", [])
+    context_structure = "\n".join([path] + depends_on)
 
     print(
         f"""
@@ -144,7 +177,7 @@ Generating:
 {path}
 
 Known Project Structure:
-{project_structure}
+{context_structure}
 """
     )
 
@@ -156,7 +189,7 @@ PROJECT SPECIFICATION
 
 PROJECT STRUCTURE
 
-{project_structure}
+{context_structure}
 
 CURRENT FILE
 
@@ -199,19 +232,7 @@ Return only file content.
     code = re.sub(r"```\n?", "", code)
     code = code.strip()
 
-    validated_code = validator.run(
-    f"""
-FILE PATH:
-{path}
-
-DESCRIPTION:
-{description}
-
-GENERATED CODE:
-
-{code}
-"""
-    )
+    validated_code = code
 
     full_path = os.path.join(
         "output/project",
@@ -230,73 +251,51 @@ GENERATED CODE:
     ) as f:
         f.write(validated_code)
 
+    repair_history = []
+    error_type = None
+
     if path.endswith(".py"):
         is_valid, error = check_python_file(full_path)
-        if is_valid:
-            import_errors = import_validator.run(
-                f"PROJECT STRUCTURE\n\n{project_structure}\n\nFILE\n\n{path}\n\nCODE\n\n{validated_code}"
-            )
-            if "VALID" not in import_errors:
-                is_valid = False
-                error = f"Import Validation Failed:\n{import_errors}"
+        if not is_valid:
+            error_type = "COMPILATION_ERROR"
+        else:
+            is_valid, error, error_type = run_test_pipeline(path, validated_code, context_structure, full_path, consensus_output, description)
 
     else:
 
         is_valid = True
         error = None
+        error_type = None
 
 
     if not is_valid:
         MAX_RETRIES = 3
 
         for attempt in range(MAX_RETRIES):
-            is_valid, error = check_python_file(full_path)
-
-            if is_valid:
-                import_errors = import_validator.run(
-                    f"PROJECT STRUCTURE\n\n{project_structure}\n\nFILE\n\n{path}\n\nCODE\n\n{validated_code}"
-                )
-                if "VALID" in import_errors:
-                    print(f"✓ Passed: {path}")
-                    break
-                else:
-                    is_valid = False
-                    error = f"Import Validation Failed:\n{import_errors}"
-
-            print(f"Fix attempt {attempt + 1} for {path}")
-
-            safe_name = path.replace("/", "_").replace("\\", "_")
-            os.makedirs("output/errors", exist_ok=True)
-            with open(f"output/errors/{safe_name}.txt", "w", encoding="utf-8") as f:
-                f.write(error)
-
+            formatted_repair_history = "\\n---\\n".join(repair_history)
+            
             validated_code = fixer.run(
                 f"""
-PROJECT STRUCTURE
+ERROR TYPE:
+{error_type}
 
-{project_structure}
+PROJECT STRUCTURE:
+{context_structure}
 
-CURRENT FILE
-
+CURRENT FILE:
 {path}
 
-FILE DESCRIPTION
-
+FILE DESCRIPTION:
 {description}
 
-COMPILATION ERROR
-
+ERROR LOG:
 {error}
 
-CURRENT CODE
+REPAIR HISTORY:
+{formatted_repair_history}
 
+CURRENT CODE:
 {validated_code}
-
-Fix the file.
-
-Ensure imports match the project structure.
-
-Return only corrected file content.
 """
             )
 
@@ -306,6 +305,26 @@ Return only corrected file content.
 
             with open(full_path, "w", encoding="utf-8") as f:
                 f.write(validated_code)
+
+            repair_history.append(f"[{error_type}]\\n{error}")
+
+            is_valid, error = check_python_file(full_path)
+
+            if not is_valid:
+                error_type = "COMPILATION_ERROR"
+            else:
+                is_valid, error, error_type = run_test_pipeline(path, validated_code, context_structure, full_path, consensus_output, description)
+            
+            if is_valid:
+                print(f"✓ Passed: {path}")
+                break
+
+            print(f"Fix attempt {attempt + 1} for {path}")
+
+            safe_name = path.replace("/", "_").replace("\\", "_")
+            os.makedirs("output/errors", exist_ok=True)
+            with open(f"output/errors/{safe_name}.txt", "w", encoding="utf-8") as f:
+                f.write(error)
 
         is_valid, error = check_python_file(full_path)
         if is_valid:

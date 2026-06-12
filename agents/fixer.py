@@ -13,14 +13,17 @@ class FixerAgent(BaseAgent):
 You are a senior Python engineer.
 
 You will receive:
+1. ERROR TYPE
+2. PROJECT STRUCTURE
+3. CURRENT FILE
+4. FILE DESCRIPTION
+5. ERROR LOG
+6. REPAIR HISTORY
+7. CURRENT CODE
 
-1. File path
-2. File content
-3. Compilation error
+Fix the code to resolve the error. If there is a REPAIR HISTORY, ensure you try a different approach than your previous failed attempts.
 
-Fix the code.
-
-Return ONLY corrected code.
+Return ONLY the corrected code.
 
 Do not explain.
 Do not use markdown.

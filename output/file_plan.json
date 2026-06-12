@@ -6,36 +6,43 @@
       "description": "Python dependencies"
     },
     {
+      "path": "app/auth/routers/login.py",
+      "description": "User authentication routes implementation"
+    },
+    {
+      "path": "app/todos/routers/v1/todos.py",
+      "description": "Todo CRUD operations endpoints"
+    },
+    {
+      "path": "app/search/queries.py",
+      "description": "Search functionality implementation"
+    },
+    {
+      "path": "app/notification/schemas.py",
+      "description": "Notification schema definitions and logic"
+    },
+    {
+      "path": "app/admin/routers/admin.py",
+      "description": "Admin management endpoints"
+    },
+    {
+      "path": "config/database.py",
+      "description": "Database configuration"
+    },
+    {
+      "path": "config/jwt.py",
+      "description": "JWT token and secret configuration"
+    },
+    {
       "path": "app/main.py",
-      "description": "FastAPI entrypoint"
-    },
-    {
-      "path": "config/settings.py",
-      "description": "Configuration settings for FastAPI and SQLAlchemy"
-    },
-    {
-      "path": "database/models.py",
-      "description": "SQLAlchemy models for todos and users"
-    },
-    {
-      "path": "database/sessionmaker.py",
-      "description": "Session factory for database connections using SQLAlchemy"
-    },
-    {
-      "path": "services/todos.py",
-      "description": "Service layer for CRUD operations on todos"
-    },
-    {
-      "path": "services/users.py",
-      "description": "Service layer for user management (including registration and login)"
-    },
-    {
-      "path": "security/jwt_middleware.py",
-      "description": "JWT middleware to validate requests and generate tokens"
-    },
-    {
-      "path": "app/routes.py",
-      "description": "Routing configuration for FastAPI endpoints"
+      "description": "FastAPI application entrypoint",
+      "depends_on": [
+        "app/auth/routers/login.py",
+        "app/todos/routers/v1/todos.py",
+        "app/search/queries.py",
+        "app/notification/schemas.py",
+        "app/admin/routers/admin.py"
+      ]
     }
   ]
 }

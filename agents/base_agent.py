@@ -1,5 +1,7 @@
 from ollama import chat
 import time
+import hashlib
+import os
 
 class BaseAgent:
     def __init__(self, name, system_prompt, model="qwen2.5:3b", num_predict=500):
@@ -10,6 +12,15 @@ class BaseAgent:
 
     def run(self, task):
         
+        cache_key = hashlib.md5(f"{self.system_prompt}{task}".encode("utf-8")).hexdigest()
+        cache_dir = "output/cache"
+        cache_path = os.path.join(cache_dir, f"{self.name.replace(' ', '_')}_{cache_key}.txt")
+        
+        if os.path.exists(cache_path):
+            with open(cache_path, "r", encoding="utf-8") as f:
+                print(f"{self.name} loaded from cache")
+                return f.read()
+
         start = time.time()
         response = chat(
             model=self.model,
@@ -30,4 +41,10 @@ class BaseAgent:
         elapsed = time.time() - start
         print(f"{self.name} took " f"{elapsed:.2f} sec")
 
-        return response["message"]["content"]
+        content = response["message"]["content"]
+        
+        os.makedirs(cache_dir, exist_ok=True)
+        with open(cache_path, "w", encoding="utf-8") as f:
+            f.write(content)
+
+        return content

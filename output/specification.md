@@ -1,51 +1,68 @@
-# Project Overview
+# Final Technical Specification
 
-The project aims to create a RESTful API using FastAPI that manages a todo list, supporting CRUD operations and authentication via JWT tokens. The architecture will be divided into application layers for security, database access, and user authentication. Key components include FastAPI, SQLAlchemy ORM, PyJWT for token management, and PostgreSQL for the database.
+## Project Overview
+This project aims to create a RESTful API using FastAPI that allows users to manage their todo items (create, read, update, delete). The system will include user authentication for securing API endpoints. Key features such as search functionality and an admin management dashboard are also included.
 
-# Functional Requirements
+## Functional Requirements
+1. **User Authentication**
+   - Users should be able to register with email and password.
+   - They can log in using their credentials.
+   - Sessions are managed securely (e.g., JWT tokens).
 
-1. **Add Todo**: Users create new todos with a title and optional description.
-2. **Update Todo**: Users modify existing todo details such as title and description.
-3. **Delete Todo**: Users remove a todo by its ID.
-4. **Retrieve Todos**: List all or filtered/ordered todos for a specific user, sorted by creation date.
-5. **Authenticate User**: Users authenticate using email and password to receive a JWT token.
+2. **Todo CRUD Operations**
+   - Users should be able to create, read, update, and delete todo items.
+   
+3. **Search Functionality**
+   - Search todos by title, description, due date range, and keywords.
 
-# System Architecture
+4. **Notification System**
+   - A reminder system that sends notifications when a user has a task approaching its due date.
+   - Option to enable/disable reminders per todo item.
 
-- **Application Layer**: FastAPI server handles HTTP requests, routing them to appropriate services based on the request type (CRUD operations).
-- **Data Access Layer**: SQLAlchemy ORM interacts with PostgreSQL database for CRUD operations on todos and user details.
-- **Security Layer**: JWT middleware validates incoming requests and manages token generation. 
+5. **Admin Management**
+   - Admins can manage all users (viewing, updating, deleting).
+   - Admin access to database schema and data.
+   - Separate dashboard for user activities, completed tasks, etc.
 
-# Technology Stack
+## System Architecture
+The system is designed as a microservices architecture with the following key components:
 
-- **Frontend**: Not explicitly defined, but typically built using frameworks like React, Angular, or Vue.js.
-- **Backend**:
-  - FastAPI framework
-  - SQLAlchemy ORM for database interactions
-  - PyJWT library for JWT management
-  - PostgreSQL database
-- **Security**:
-  - Flask-JWT-Extended (optional) for extended functionality
-  - HTTPS encryption provided by default with FastAPI setup
-  - PyCryptodome for sensitive data encryption
+- **User Management Service**: Handles registration, login, JWT token generation, and session management.
+  
+- **Todo CRUD Operations Service**: Manages todo creation, reading, updating, and deletion.
 
-# Implementation Plan
+- **Search Functionality Service**: Implements search capabilities across todos.
 
-### Phase 1: Design and Initial Development
-#### Task 1.1: Define API Endpoints
-Create all necessary CRUD APIs using FastAPI, including authentication.
+- **Notification Service**: Sends reminders for approaching due dates.
 
-- **Input Parameters**: 
-  - AddTodo: `title`, `description`, `userId`
-  - UpdateTodo: `todoId`, `title`, `description`
-  - DeleteTodo: `todoId`
-  - RetrieveTodos: `userId` (optional), `sortOrder`
+- **Admin Management Service**: Manages users and databases via API. Provides admin-only dashboard.
 
-- **Response Data**:
-  - Success messages and corresponding data structures for success responses.
+## Technology Stack
+1. **Frontend**
+   - React or Vue.js
 
-#### Task 1.2: Implement Authentication Mechanism
-Set up user authentication with JWT tokens, including validation and token generation middleware.
+2. **Backend**
+   - FastAPI framework
 
-- **User Registration**: Register new users via POST request to `/auth/register` with username and password.
-- **Login**:
+3. **Database**
+   - PostgreSQL (for data storage)
+
+4. **Authentication**
+   - JSON Web Tokens (JWT) library
+  
+5. **Caching**
+   - Redis for read-heavy operations.
+
+6. **Security**
+   - HTTPS for secure transmission.
+   - Input validation and parameterized queries using SQLAlchemy ORM to protect against SQL injection.
+   
+7. **Performance**
+   - Efficient use of database transactions, caching layers like Redis or Memcached.
+
+8. **Notifications**
+   - AWS SNS for sending notifications.
+
+9. **Monitoring & Logging**
+   - Prometheus for monitoring health and performance metrics.
+   - Sentry for logging errors
