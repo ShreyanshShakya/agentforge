@@ -30,6 +30,8 @@ from agents.test_generator   import TestGeneratorAgent
 
 from utils.json_parser import parse_json
 from pipeline.generator import generate_all_files
+from pipeline.integration import run_integration_phase, format_integration_report
+from agents.dependency_agent import resolve_dependencies
 
 
 # ── Logging setup ──────────────────────────────────────────────────────────────
@@ -111,6 +113,16 @@ def build_parser() -> argparse.ArgumentParser:
         default=config.MAX_WORKERS,
         metavar="N",
         help=f"Number of parallel file-generation workers. Default: {config.MAX_WORKERS}.",
+    )
+
+    # Integration testing (v0.7)
+    parser.add_argument(
+        "--integration",
+        action="store_true",
+        help=(
+            "Run post-generation integration phase: install dependencies, "
+            "execute runtime test, and validate API endpoints (FastAPI/Flask)."
+        ),
     )
 
     # Verbosity
@@ -258,6 +270,34 @@ def run_pipeline(args):
         for r in failed:
             logger.warning("  ✗ %s (after %d attempts)", r["path"], r["attempts"])
     logger.info("Output : %s", config.PROJECT_DIR)
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # PHASE 3: Integration Testing (opt-in via --integration)
+    # ──────────────────────────────────────────────────────────────────────────
+    if args.integration:
+        logger.info("=== Phase 3: Integration Testing ===")
+
+        # Step 1 — Dependency resolution
+        logger.info("Installing project dependencies...")
+        dep_ok, dep_err = resolve_dependencies(config.PROJECT_DIR)
+        if not dep_ok:
+            logger.warning("Dependency installation failed:\n%s", dep_err)
+            logger.warning("Continuing with integration tests using system Python.")
+
+        # Step 2 — Runtime + API validation
+        integration_results = run_integration_phase(
+            file_plan=files,
+            project_dir=config.PROJECT_DIR,
+        )
+        logger.info(format_integration_report(integration_results))
+
+        # Surface failures clearly
+        rt = integration_results.get("runtime") or {}
+        api = integration_results.get("api") or {}
+        if not rt.get("success", True):
+            logger.warning("Runtime integration test FAILED.")
+        if api and not api.get("success", True):
+            logger.warning("API endpoint validation FAILED.")
 
 
 # ── Entry point ────────────────────────────────────────────────────────────────

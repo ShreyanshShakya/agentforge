@@ -1,4 +1,4 @@
-# Agentic Codex (v0.6.0)
+# Agentic Codex (v0.7.0)
 
 ## ⭐ Highlights
 
@@ -12,6 +12,9 @@
 - **Persistent repair memory** across runs
 - **Agent output caching** for rapid iteration, with `--no-cache` / `--clear-cache` flags
 - **Docker + AWS deployable** out of the box
+- **Runtime integration testing** — runs generated projects and validates they start cleanly
+- **API endpoint validation** — auto-discovers and hits FastAPI/Flask routes, asserts HTTP 2xx
+- **Dependency resolution** — installs `requirements.txt` into an isolated venv before tests
 
 Agentic Codex is an advanced, fully autonomous AI software engineering pipeline. Instead of a single LLM trying to write an entire project at once, Agentic Codex breaks down the software development lifecycle into specialized, distinct agents. The system is entirely self-healing—capable of catching its own syntax errors, broken imports, and failed unit tests, and intelligently repairing its own code.
 
@@ -273,11 +276,13 @@ agentforge/
 │   ├── fixer.py
 │   ├── import_validator.py
 │   ├── test_generator.py
+│   ├── dependency_agent.py   # v0.7: installs requirements.txt into .venv
 │   └── validator.py
 │
 ├── pipeline/
 │   ├── generator.py          # Parallel generation + stateful fixer loop
-│   └── tester.py             # Import validation + test gen + pytest execution
+│   ├── tester.py             # Import validation + test gen + pytest execution
+│   └── integration.py        # v0.7: runtime test + API endpoint validation
 │
 ├── utils/
 │   ├── cleaner.py            # strip_markdown() — centralised LLM output cleaning
@@ -351,7 +356,7 @@ See the unedited raw log from the v0.4.5 pipeline run:
 
 ## 🔮 Roadmap
 
-### v0.6 ✅ (current)
+### v0.6 ✅
 - [x] CLI with argparse — task as argument, model selection, cache flags
 - [x] Configurable models per agent via `config.py`
 - [x] Parallel file generation with wave-based dependency scheduling
@@ -364,10 +369,15 @@ See the unedited raw log from the v0.4.5 pipeline run:
 - [x] Docker + Docker Compose deployment
 - [x] AWS EC2 deployment scripts
 
-### v0.7
-- [ ] Runtime integration testing
-- [ ] API endpoint validation
-- [ ] Dependency resolution agent
+### v0.7 ✅ (current)
+- [x] Dependency resolution agent — installs `requirements.txt` into a venv before tests run (`agents/dependency_agent.py`)
+- [x] Runtime integration testing — runs the generated project entry point as a subprocess and verifies it starts cleanly (`pipeline/integration.py`)
+- [x] API endpoint validation — detects FastAPI/Flask, starts the server, discovers routes from decorators, hits each endpoint and asserts HTTP 2xx (`pipeline/integration.py`)
+
+Enable the integration phase with:
+```bash
+python main.py "Build a FastAPI Todo API" --integration
+```
 
 ### v1.0
 - [ ] Autonomous software engineering agent
