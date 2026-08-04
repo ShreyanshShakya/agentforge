@@ -4,3 +4,9 @@ output/
 *.log
 venv/
 .env
+
+# Local-only files — not tracked in git
+CHANGES.md
+*.pem
+project.tar.gz
+

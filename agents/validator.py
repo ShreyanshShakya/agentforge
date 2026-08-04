@@ -1,14 +1,13 @@
 from agents.base_agent import BaseAgent
+import config
 
 
 class ValidatorAgent(BaseAgent):
-
-    def __init__(self):
-
+    def __init__(self, model: str = None):
         super().__init__(
             name="Validator",
-            model="qwen2.5-coder:7b",
-            num_predict=3000,
+            model=model or config.DEFAULT_CODER_MODEL,
+            num_predict=config.NUM_PREDICT["validator"],
             system_prompt="""
 You are a Senior Software Engineer and Code Reviewer.
 
@@ -33,5 +32,5 @@ Return ONLY the corrected file content.
 Do not explain anything.
 Do not use markdown.
 Do not add comments outside the code.
-"""
+""",
         )

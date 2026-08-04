@@ -1,0 +1,45 @@
+# Git
+.git
+.gitignore
+
+# Python cache
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info
+dist/
+build/
+.eggs/
+
+# Virtual envs
+.venv
+venv
+env
+
+# Generated output (don't bake into image; mounted as volume at runtime)
+output/
+
+# Docker files (not needed inside image)
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Deploy/infra scripts
+deploy.sh
+infra/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Example data (large, not needed at runtime)
+example/
+img.png
+README.md

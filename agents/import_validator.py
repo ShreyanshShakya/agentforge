@@ -1,11 +1,13 @@
 from agents.base_agent import BaseAgent
+import config
+
 
 class ImportValidatorAgent(BaseAgent):
-    def __init__(self):
+    def __init__(self, model: str = None):
         super().__init__(
             name="Import Validator",
-            model="qwen2.5-coder:7b",
-            num_predict=1000,
+            model=model or config.DEFAULT_CODER_MODEL,
+            num_predict=config.NUM_PREDICT["import_validator"],
             system_prompt="""
 You are an Import Validation tool.
 
@@ -25,5 +27,5 @@ VALID
 If there are broken imports (e.g., referencing a file that does not exist in the PROJECT STRUCTURE, or using an invalid relative import), report them clearly.
 
 Do not write any code. Just report the broken imports or VALID.
-"""
+""",
         )

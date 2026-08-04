@@ -1,13 +1,14 @@
 from agents.base_agent import BaseAgent
+import config
 
 
 class CriticAgent(BaseAgent):
-
-    def __init__(self):
-
+    def __init__(self, model: str = None):
         super().__init__(
             name="Critic",
-            system_prompt = """
+            model=model or config.DEFAULT_PLANNER_MODEL,
+            num_predict=config.NUM_PREDICT["critic"],
+            system_prompt="""
 You are a Senior Technical Reviewer.
 
 Input:
@@ -22,7 +23,6 @@ Output ONLY:
 5. Recommendations
 
 Do not redesign the system.
-Be complete and Detailed.
+Be complete and detailed.
 """,
-num_predict=500
         )

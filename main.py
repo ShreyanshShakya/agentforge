@@ -1,340 +1,292 @@
-from agents.analyst import AnalystAgent
-from agents.planner import PlannerAgent
-from agents.consensus import ConsensusAgent
-from agents.critic import CriticAgent
-from agents.architect import ArchitectAgent
-from agents.coder import CoderAgent
-from agents.file_planner import FilePlannerAgent
-from utils.json_parser import parse_json
-from agents.validator import ValidatorAgent
-from agents.fixer import FixerAgent
-from utils.compiler import check_python_file
+"""
+main.py — AgentForge CLI entry point.
+
+Usage:
+    python main.py "Build a FastAPI Todo API with JWT auth"
+    python main.py "..." --planner-model qwen2.5:7b --coder-model qwen2.5-coder:14b
+    python main.py "..." --no-cache
+    python main.py "..." --clear-cache
+    python main.py --list-models
+"""
+
+import argparse
+import logging
+import shutil
+import sys
+
+import config
+from config import AVAILABLE_MODELS
+
+from agents.analyst       import AnalystAgent
+from agents.architect     import ArchitectAgent
+from agents.critic        import CriticAgent
+from agents.planner       import PlannerAgent
+from agents.consensus     import ConsensusAgent
+from agents.file_planner  import FilePlannerAgent
+from agents.coder         import CoderAgent
+from agents.fixer         import FixerAgent
 from agents.import_validator import ImportValidatorAgent
-from agents.test_generator import TestGeneratorAgent
-import os
-import re
-import subprocess
+from agents.test_generator   import TestGeneratorAgent
 
-task = """
-Build a FastAPI Todo API.
-"""
+from utils.json_parser import parse_json
+from pipeline.generator import generate_all_files
 
 
-# Create agent instances
-analyst = AnalystAgent()
-architect = ArchitectAgent()
-critic = CriticAgent()
-planner = PlannerAgent()
-consensus = ConsensusAgent()
-coder = CoderAgent()
-file_planner = FilePlannerAgent()
-fixer = FixerAgent()
-import_validator = ImportValidatorAgent()
-test_generator = TestGeneratorAgent()
+# ── Logging setup ──────────────────────────────────────────────────────────────
 
-# Run workflow
-analysis = analyst.run(task)
-
-architecture = architect.run(
-    f"""
-    Requirements:
-    {analysis}
-    """
-)
-
-critique = critic.run(
-    f"""
-    Requirements:
-    {analysis}
-
-    Architecture:
-    {architecture}
-    """
-)
-
-plan = planner.run(
-    f"""
-    Requirements:
-    {analysis}
-
-    Architecture:
-    {architecture}
-
-    Critique:
-    {critique}
-    """
-)
-
-consensus_output = consensus.run(
-    f"""
-ANALYSIS:
-{analysis}
-
-ARCHITECTURE:
-{architecture}
-
-CRITIQUE:
-{critique}
-
-PLAN:
-{plan}
-"""
-)
+def _setup_logging(level: str):
+    logging.basicConfig(
+        level=getattr(logging, level.upper(), logging.INFO),
+        format=config.LOG_FORMAT,
+        datefmt=config.LOG_DATE,
+    )
 
 
-# Print results
-print("\n===== ANALYST =====\n")
-print(analysis)
+# ── CLI ────────────────────────────────────────────────────────────────────────
 
-print("\n===== ARCHITECT =====\n")
-print(architecture)
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="agentforge",
+        description="AgentForge — autonomous multi-agent code generation pipeline",
+    )
 
-print("\n===== CRITIC =====\n")
-print(critique)
+    parser.add_argument(
+        "task",
+        nargs="?",
+        default=None,
+        help="Natural language description of the project to build.",
+    )
 
-print("\n===== PLANNER =====\n")
-print(plan)
+    # Model selection
+    model_choices = AVAILABLE_MODELS
+    parser.add_argument(
+        "--planner-model",
+        default=config.DEFAULT_PLANNER_MODEL,
+        metavar="MODEL",
+        help=(
+            f"Ollama model for design-phase agents (analyst, architect, critic, planner, consensus, file-planner). "
+            f"Default: {config.DEFAULT_PLANNER_MODEL}"
+        ),
+    )
+    parser.add_argument(
+        "--coder-model",
+        default=config.DEFAULT_CODER_MODEL,
+        metavar="MODEL",
+        help=(
+            f"Ollama model for code-generation agents (coder, fixer, import-validator, test-generator). "
+            f"Default: {config.DEFAULT_CODER_MODEL}"
+        ),
+    )
+    parser.add_argument(
+        "--list-models",
+        action="store_true",
+        help="Print available model options and exit.",
+    )
 
-print("\n===== CONSENSUS =====\n")
-print(consensus_output)
+    # Cache control
+    cache_group = parser.add_mutually_exclusive_group()
+    cache_group.add_argument(
+        "--no-cache",
+        action="store_true",
+        help="Disable cache reads; always call the LLM (results still saved).",
+    )
+    cache_group.add_argument(
+        "--clear-cache",
+        action="store_true",
+        help="Delete all cached agent outputs before running.",
+    )
 
-with open(
-    "output/specification.md",
-    "w",
-    encoding="utf-8"
-) as f:
-    f.write(consensus_output)
-print(
-    "\nSpecification saved to output/specification.md"
-)
+    # Output
+    parser.add_argument(
+        "--output-dir",
+        default=None,
+        metavar="PATH",
+        help="Override the output directory (default: ./output).",
+    )
+
+    # Parallelism
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=config.MAX_WORKERS,
+        metavar="N",
+        help=f"Number of parallel file-generation workers. Default: {config.MAX_WORKERS}.",
+    )
+
+    # Verbosity
+    parser.add_argument(
+        "--log-level",
+        default=config.LOG_LEVEL,
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+        help=f"Logging verbosity. Default: {config.LOG_LEVEL}.",
+    )
+
+    return parser
 
 
-file_plan = file_planner.run(
-    consensus_output
-)
+# ── Pipeline ───────────────────────────────────────────────────────────────────
 
-with open(
-    "output/file_plan.json",
-    "w",
-    encoding="utf-8"
-) as f:
-    f.write(file_plan)
+def run_pipeline(args):
+    logger = logging.getLogger("agentforge")
 
-parsed_file_plan = parse_json(
-    file_plan
-)
+    # Override output dir if requested
+    if args.output_dir:
+        from pathlib import Path
+        config.OUTPUT_DIR  = Path(args.output_dir)
+        config.CACHE_DIR   = config.OUTPUT_DIR / "cache"
+        config.ERRORS_DIR  = config.OUTPUT_DIR / "errors"
+        config.PROJECT_DIR = config.OUTPUT_DIR / "project"
+        config.REPAIR_DIR  = config.OUTPUT_DIR / "repair_history"
+        config.SPEC_FILE       = config.OUTPUT_DIR / "specification.md"
+        config.FILE_PLAN_FILE  = config.OUTPUT_DIR / "file_plan.json"
 
-print("\n===== FILE PLAN =====\n")
-print(parsed_file_plan)
+    use_cache = not args.no_cache
 
-project_structure = "\n".join(
-    [
-        file["path"]
-        for file in parsed_file_plan["files"]
+    # ── Create agents with chosen models ──────────────────────────────────────
+    pm = args.planner_model
+    cm = args.coder_model
+
+    logger.info("Planner model : %s", pm)
+    logger.info("Coder model   : %s", cm)
+
+    analyst          = AnalystAgent(model=pm)
+    architect        = ArchitectAgent(model=pm)
+    critic           = CriticAgent(model=pm)
+    planner          = PlannerAgent(model=pm)
+    consensus        = ConsensusAgent(model=pm)
+    file_planner     = FilePlannerAgent(model=pm)
+    coder            = CoderAgent(model=cm)
+    fixer            = FixerAgent(model=cm)
+    import_validator = ImportValidatorAgent(model=cm)
+    test_generator   = TestGeneratorAgent(model=cm)
+
+    all_agents = [
+        analyst, architect, critic, planner, consensus, file_planner,
+        coder, fixer, import_validator, test_generator,
     ]
-)
 
-def run_test_pipeline(path, validated_code, context_structure, full_path, consensus_output, description):
-    if path.endswith("__init__.py") or path.endswith(".txt"):
-        return True, None, None
+    # ── Clear cache if requested ───────────────────────────────────────────────
+    if args.clear_cache:
+        if config.CACHE_DIR.exists():
+            shutil.rmtree(config.CACHE_DIR)
+            logger.info("Cache cleared: %s", config.CACHE_DIR)
 
-    import_errors = import_validator.run(
-        f"PROJECT STRUCTURE\n\n{context_structure}\n\nFILE\n\n{path}\n\nCODE\n\n{validated_code}"
+    # ── Ensure output dirs exist ───────────────────────────────────────────────
+    for d in [config.OUTPUT_DIR, config.CACHE_DIR, config.PROJECT_DIR,
+              config.ERRORS_DIR, config.REPAIR_DIR]:
+        d.mkdir(parents=True, exist_ok=True)
+
+    task = args.task
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # PHASE 1: System Design
+    # ──────────────────────────────────────────────────────────────────────────
+    logger.info("=== Phase 1: System Design ===")
+
+    analysis = analyst.run(task, use_cache=use_cache)
+    logger.info("\n--- ANALYST ---\n%s", analysis)
+
+    architecture = architect.run(
+        f"Requirements:\n{analysis}",
+        use_cache=use_cache,
     )
-    if "VALID" not in import_errors:
-        return False, f"Import Validation Failed:\n{import_errors}", "IMPORT_ERROR"
-    
-    test_file_path = full_path.replace("output/project/", "output/project/tests/")
-    test_dir = os.path.dirname(test_file_path)
-    os.makedirs(test_dir, exist_ok=True)
-    basename = os.path.basename(test_file_path)
-    if not basename.startswith("test_"):
-        test_file_path = os.path.join(test_dir, "test_" + basename)
-    
-    if not os.path.exists(test_file_path):
-        test_code = test_generator.run(f"CONSENSUS SPECIFICATION\n\n{consensus_output}\n\nPROJECT STRUCTURE\n\n{context_structure}\n\nFILE DESCRIPTION\n\n{description}\n\nFILE\n\n{path}\n\nCODE\n\n{validated_code}")
-        test_code = re.sub(r"```[a-zA-Z]*\n?", "", test_code)
-        test_code = re.sub(r"```\n?", "", test_code).strip()
-        with open(test_file_path, "w", encoding="utf-8") as f:
-            f.write(test_code)
-        
-    result = subprocess.run(["python", "-m", "pytest", test_file_path], capture_output=True, text=True, cwd="output/project")
-    if result.returncode != 0:
-        return False, f"Pytest Execution Failed:\n{result.stderr}\n{result.stdout}", "PYTEST_FAILURE"
-    return True, None, None
+    logger.info("\n--- ARCHITECT ---\n%s", architecture)
 
-for file_info in parsed_file_plan["files"]:
-
-    path = file_info["path"]
-    description = file_info["description"]
-
-    depends_on = file_info.get("depends_on", [])
-    context_structure = "\n".join([path] + depends_on)
-
-    print(
-        f"""
-Generating:
-{path}
-
-Known Project Structure:
-{context_structure}
-"""
+    critique = critic.run(
+        f"Requirements:\n{analysis}\n\nArchitecture:\n{architecture}",
+        use_cache=use_cache,
     )
+    logger.info("\n--- CRITIC ---\n%s", critique)
 
-    code = coder.run(
-        f"""
-PROJECT SPECIFICATION
+    plan = planner.run(
+        f"Requirements:\n{analysis}\n\nArchitecture:\n{architecture}\n\nCritique:\n{critique}",
+        use_cache=use_cache,
+    )
+    logger.info("\n--- PLANNER ---\n%s", plan)
 
-{consensus_output}
+    consensus_output = consensus.run(
+        f"ANALYSIS:\n{analysis}\n\nARCHITECTURE:\n{architecture}\n\n"
+        f"CRITIQUE:\n{critique}\n\nPLAN:\n{plan}",
+        use_cache=use_cache,
+    )
+    logger.info("\n--- CONSENSUS ---\n%s", consensus_output)
 
-PROJECT STRUCTURE
+    config.SPEC_FILE.write_text(consensus_output, encoding="utf-8")
+    logger.info("Specification saved: %s", config.SPEC_FILE)
 
-{context_structure}
+    # ── File plan ──────────────────────────────────────────────────────────────
+    file_plan_raw = file_planner.run(consensus_output, use_cache=use_cache)
+    config.FILE_PLAN_FILE.write_text(file_plan_raw, encoding="utf-8")
 
-CURRENT FILE
+    try:
+        parsed = parse_json(file_plan_raw)
+    except ValueError as exc:
+        logger.error("Failed to parse file plan JSON: %s", exc)
+        sys.exit(1)
 
-{path}
+    files = parsed.get("files")
+    if not files or not isinstance(files, list):
+        logger.error("file_plan.json is missing a 'files' array.")
+        sys.exit(1)
 
-FILE DESCRIPTION
+    logger.info("File plan: %d files to generate", len(files))
 
-{description}
+    # ──────────────────────────────────────────────────────────────────────────
+    # PHASE 2: Parallel Generation & Self-Healing
+    # ──────────────────────────────────────────────────────────────────────────
+    logger.info("=== Phase 2: Code Generation ===")
 
-IMPORTANT:
-
-Only generate code for:
-{path}
-
-The generated code must be compatible with
-all files listed in PROJECT STRUCTURE.
-
-Use imports that match the structure.
-
-Do not generate code for any other file.
-
-Do not use markdown.
-
-Return only file content.
-"""
+    results = generate_all_files(
+        file_plan=files,
+        consensus_output=consensus_output,
+        coder=coder,
+        fixer=fixer,
+        import_validator=import_validator,
+        test_generator=test_generator,
+        use_cache=use_cache,
+        max_workers=args.workers,
     )
 
-    code = re.sub(
-        r"FILE:.*?\n",
-        "",
-        code
-    )
+    # ── Summary ────────────────────────────────────────────────────────────────
+    passed  = [r for r in results if r["success"]]
+    failed  = [r for r in results if not r["success"]]
 
-    code = code.replace(
-        "END_FILE",
-        ""
-    )
-
-    code = re.sub(r"```[a-zA-Z]*\n?", "", code)
-    code = re.sub(r"```\n?", "", code)
-    code = code.strip()
-
-    validated_code = code
-
-    full_path = os.path.join(
-        "output/project",
-        path
-    )
-
-    os.makedirs(
-        os.path.dirname(full_path),
-        exist_ok=True
-    )
-
-    with open(
-        full_path,
-        "w",
-        encoding="utf-8"
-    ) as f:
-        f.write(validated_code)
-
-    repair_history = []
-    error_type = None
-
-    if path.endswith(".py"):
-        is_valid, error = check_python_file(full_path)
-        if not is_valid:
-            error_type = "COMPILATION_ERROR"
-        else:
-            is_valid, error, error_type = run_test_pipeline(path, validated_code, context_structure, full_path, consensus_output, description)
-
-    else:
-
-        is_valid = True
-        error = None
-        error_type = None
+    logger.info("\n=== Generation Summary ===")
+    logger.info("Passed : %d", len(passed))
+    logger.info("Failed : %d", len(failed))
+    if failed:
+        for r in failed:
+            logger.warning("  ✗ %s (after %d attempts)", r["path"], r["attempts"])
+    logger.info("Output : %s", config.PROJECT_DIR)
 
 
-    if not is_valid:
-        MAX_RETRIES = 3
+# ── Entry point ────────────────────────────────────────────────────────────────
 
-        for attempt in range(MAX_RETRIES):
-            formatted_repair_history = "\\n---\\n".join(repair_history)
-            
-            validated_code = fixer.run(
-                f"""
-ERROR TYPE:
-{error_type}
+def main():
+    parser = build_parser()
+    args   = parser.parse_args()
 
-PROJECT STRUCTURE:
-{context_structure}
+    _setup_logging(args.log_level)
+    logger = logging.getLogger("agentforge")
 
-CURRENT FILE:
-{path}
+    if args.list_models:
+        print("Available models:")
+        for m in AVAILABLE_MODELS:
+            print(f"  {m}")
+        sys.exit(0)
 
-FILE DESCRIPTION:
-{description}
+    if not args.task:
+        parser.error("A task description is required. Example:\n  python main.py \"Build a FastAPI Todo API\"")
 
-ERROR LOG:
-{error}
-
-REPAIR HISTORY:
-{formatted_repair_history}
-
-CURRENT CODE:
-{validated_code}
-"""
-            )
-
-            validated_code = re.sub(r"```[a-zA-Z]*\n?", "", validated_code)
-            validated_code = re.sub(r"```\n?", "", validated_code)
-            validated_code = validated_code.strip()
-
-            with open(full_path, "w", encoding="utf-8") as f:
-                f.write(validated_code)
-
-            repair_history.append(f"[{error_type}]\\n{error}")
-
-            is_valid, error = check_python_file(full_path)
-
-            if not is_valid:
-                error_type = "COMPILATION_ERROR"
-            else:
-                is_valid, error, error_type = run_test_pipeline(path, validated_code, context_structure, full_path, consensus_output, description)
-            
-            if is_valid:
-                print(f"✓ Passed: {path}")
-                break
-
-            print(f"Fix attempt {attempt + 1} for {path}")
-
-            safe_name = path.replace("/", "_").replace("\\", "_")
-            os.makedirs("output/errors", exist_ok=True)
-            with open(f"output/errors/{safe_name}.txt", "w", encoding="utf-8") as f:
-                f.write(error)
-
-        is_valid, error = check_python_file(full_path)
-        if is_valid:
-            print(f"✓ Passed successfully after fixes: {path}")
-        else:
-            print(f" Still failing after {MAX_RETRIES} attempts: {path}")
+    try:
+        run_pipeline(args)
+    except KeyboardInterrupt:
+        logger.info("Interrupted by user.")
+        sys.exit(0)
+    except Exception as exc:
+        logger.exception("Pipeline failed with an unexpected error: %s", exc)
+        sys.exit(1)
 
 
-
-    print(
-        f"Created: {full_path}"
-    )
-
+if __name__ == "__main__":
+    main()

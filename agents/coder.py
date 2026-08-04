@@ -1,13 +1,13 @@
 from agents.base_agent import BaseAgent
+import config
 
 
 class CoderAgent(BaseAgent):
-
-    def __init__(self):
-
+    def __init__(self, model: str = None):
         super().__init__(
             name="Coder",
-            model="qwen2.5-coder:7b",
+            model=model or config.DEFAULT_CODER_MODEL,
+            num_predict=config.NUM_PREDICT["coder"],
             system_prompt="""
 You are a senior software engineer.
 
@@ -23,16 +23,6 @@ FILE: README.md
 
 END_FILE
 
-FILE: main.py
-<content>
-
-END_FILE
-
-FILE: config.py
-<content>
-
-END_FILE
-
 Rules:
 1. Do NOT use markdown code blocks.
 2. Do NOT use ``` fences.
@@ -40,5 +30,4 @@ Rules:
 4. Every file MUST end with END_FILE.
 5. Output complete file contents.
 """,
-num_predict=4000
         )

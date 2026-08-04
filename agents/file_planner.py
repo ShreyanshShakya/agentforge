@@ -1,14 +1,13 @@
 from agents.base_agent import BaseAgent
+import config
 
 
 class FilePlannerAgent(BaseAgent):
-
-    def __init__(self):
-
+    def __init__(self, model: str = None):
         super().__init__(
             name="File Planner",
-            model="qwen2.5:3b",
-            num_predict=2000,
+            model=model or config.DEFAULT_PLANNER_MODEL,
+            num_predict=config.NUM_PREDICT["file_planner"],
             system_prompt="""
 You are a software architect.
 
@@ -37,5 +36,5 @@ Example:
     }
   ]
 }
-"""
+""",
         )

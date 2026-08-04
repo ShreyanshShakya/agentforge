@@ -1,13 +1,14 @@
 from agents.base_agent import BaseAgent
+import config
 
 
 class AnalystAgent(BaseAgent):
-
-    def __init__(self):
-
+    def __init__(self, model: str = None):
         super().__init__(
             name="Analyst",
-            system_prompt = """
+            model=model or config.DEFAULT_PLANNER_MODEL,
+            num_predict=config.NUM_PREDICT["analyst"],
+            system_prompt="""
 You are a Requirements Analyst.
 
 Output ONLY:
@@ -21,5 +22,4 @@ Do not discuss architecture.
 Do not create implementation plans.
 Be complete and detailed.
 """,
-num_predict=500
         )

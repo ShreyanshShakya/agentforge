@@ -1,14 +1,13 @@
 from agents.base_agent import BaseAgent
+import config
 
 
 class FixerAgent(BaseAgent):
-
-    def __init__(self):
-
+    def __init__(self, model: str = None):
         super().__init__(
             name="Fixer",
-            model="qwen2.5-coder:7b",
-            num_predict=3000,
+            model=model or config.DEFAULT_CODER_MODEL,
+            num_predict=config.NUM_PREDICT["fixer"],
             system_prompt="""
 You are a senior Python engineer.
 
@@ -27,5 +26,5 @@ Return ONLY the corrected code.
 
 Do not explain.
 Do not use markdown.
-"""
+""",
         )

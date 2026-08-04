@@ -1,0 +1,50 @@
+services:
+
+  # ── Ollama LLM runtime ──────────────────────────────────────────────────────
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama   # persist pulled models across restarts
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    # GPU support: uncomment the deploy block if the EC2 instance has a GPU
+    # (e.g. g4dn.xlarge with the NVIDIA Container Toolkit installed)
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+  # ── AgentForge pipeline ─────────────────────────────────────────────────────
+  agentforge:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: agentforge
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+      # Override task via env var; default shown below
+      AGENTFORGE_TASK: ${AGENTFORGE_TASK:-Build a simple FastAPI Hello World API.}
+      AGENTFORGE_PLANNER_MODEL: ${AGENTFORGE_PLANNER_MODEL:-qwen2.5:3b}
+      AGENTFORGE_CODER_MODEL: ${AGENTFORGE_CODER_MODEL:-qwen2.5-coder:7b}
+      AGENTFORGE_WORKERS: ${AGENTFORGE_WORKERS:-2}
+    volumes:
+      - ./output:/app/output    # expose generated project to host
+    restart: "no"               # run once, do not loop
+
+
+volumes:
+  ollama_data:

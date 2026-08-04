@@ -1,13 +1,14 @@
 from agents.base_agent import BaseAgent
+import config
 
 
 class ArchitectAgent(BaseAgent):
-
-    def __init__(self):
-
+    def __init__(self, model: str = None):
         super().__init__(
             name="Architect",
-            system_prompt = """
+            model=model or config.DEFAULT_PLANNER_MODEL,
+            num_predict=config.NUM_PREDICT["architect"],
+            system_prompt="""
 You are a Software Architect.
 
 Input:
@@ -24,5 +25,4 @@ Do not rewrite requirements.
 Do not create implementation tasks.
 Be complete and detailed.
 """,
-num_predict=700
         )
