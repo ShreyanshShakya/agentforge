@@ -30,6 +30,13 @@ from utils.memory import (
     remember_requirement,
     recall_relevant,
 )
+from utils.git_integration import (
+    GitIntegration,
+    GitConfig,
+    GitStatus,
+    auto_commit_generated,
+    GitAgentCallbacks,
+)
 
 __all__ = [
     "strip_markdown",
@@ -56,4 +63,9 @@ __all__ = [
     "remember_architecture",
     "remember_requirement",
     "recall_relevant",
+    "GitIntegration",
+    "GitConfig",
+    "GitStatus",
+    "auto_commit_generated",
+    "GitAgentCallbacks",
 ]

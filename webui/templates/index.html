@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AgentForge Web UI</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; }
+        .header { background: #1a1a2e; color: white; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; }
+        .header h1 { font-size: 1.5rem; }
+        .status-badge { padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
+        .status-running { background: #10b981; color: white; }
+        .status-stopped { background: #ef4444; color: white; }
+        .container { display: grid; grid-template-columns: 300px 1fr; height: calc(100vh - 64px); }
+        .sidebar { background: white; border-right: 1px solid #e5e7eb; overflow-y: auto; padding: 1rem; }
+        .main { overflow-y: auto; padding: 1.5rem; }
+        .section { margin-bottom: 1.5rem; }
+        .section h2 { font-size: 0.875rem; font-weight: 600; color: #374151; margin-bottom: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; }
+        .btn { padding: 0.5rem 1rem; border: none; border-radius: 0.375rem; font-size: 0.875rem; font-weight: 500; cursor: pointer; transition: all 0.2s; }
+        .btn-primary { background: #1a1a2e; color: white; }
+        .btn-primary:hover { background: #16213e; }
+        .btn-danger { background: #ef4444; color: white; }
+        .btn-danger:hover { background: #dc2626; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .input-group { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+        .input-group input { flex: 1; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 0.375rem; }
+        .goal-list, .task-list { max-height: 300px; overflow-y: auto; }
+        .goal-item, .task-item { padding: 0.75rem; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0.375rem; margin-bottom: 0.5rem; }
+        .goal-item.pending { border-left: 3px solid #f59e0b; }
+        .goal-item.in_progress { border-left: 3px solid #3b82f6; }
+        .goal-item.completed { border-left: 3px solid #10b981; }
+        .goal-item.failed { border-left: 3px solid #ef4444; }
+        .goal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem; }
+        .goal-title { font-weight: 500; font-size: 0.875rem; }
+        .goal-meta { font-size: 0.75rem; color: #6b7280; }
+        .task-item { font-size: 0.8125rem; }
+        .task-header { display: flex; justify-content: space-between; margin-bottom: 0.25rem; }
+        .task-agent { font-family: monospace; font-size: 0.75rem; background: #e5e7eb; padding: 0.125rem 0.375rem; border-radius: 0.25rem; }
+        .log-entry { padding: 0.5rem; font-family: monospace; font-size: 0.75rem; background: #1e1e1e; color: #d4d4d4; border-radius: 0.25rem; margin-bottom: 0.25rem; }
+        .log-info { border-left: 3px solid #3b82f6; }
+        .log-success { border-left: 3px solid #10b981; }
+        .log-error { border-left: 3px solid #ef4444; }
+        .log-warning { border-left: 3px solid #f59e0b; }
+        .tab { display: none; }
+        .tab.active { display: block; }
+        .tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+        .tab-btn { padding: 0.5rem 1rem; background: #f3f4f6; border: none; border-radius: 0.375rem; cursor: pointer; font-size: 0.875rem; }
+        .tab-btn.active { background: #1a1a2e; color: white; }
+        .file-tree { font-family: monospace; font-size: 0.8125rem; }
+        .file-tree ul { list-style: none; padding-left: 1.5rem; }
+        .file-tree li { padding: 0.125rem 0; cursor: pointer; }
+        .file-tree li:hover { color: #3b82f6; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100; justify-content: center; align-items: center; }
+        .modal.active { display: flex; }
+        .modal-content { background: white; padding: 1.5rem; border-radius: 0.5rem; width: 90%; max-width: 600px; max-height: 80vh; overflow-y: auto; }
+        .file-content { font-family: monospace; font-size: 0.75rem; background: #1e1e1e; color: #d4d4d4; padding: 1rem; border-radius: 0.375rem; max-height: 500px; overflow: auto; white-space: pre-wrap; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; }
+        .stat-card { background: white; padding: 1rem; border-radius: 0.5rem; border: 1px solid #e5e7eb; }
+        .stat-value { font-size: 2rem; font-weight: 700; color: #1a1a2e; }
+        .stat-label { font-size: 0.75rem; color: #6b7280; text-transform: uppercase; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>AgentForge Web UI</h1>
+        <span id="statusBadge" class="status-badge status-stopped">Stopped</span>
+    </div>
+
+    <div class="container">
+        <aside class="sidebar">
+            <div class="section">
+                <h2>Control</h2>
+                <div class="input-group">
+                    <input type="text" id="taskInput" placeholder="Enter task description..." value="Build a REST API with authentication">
+                    <select id="plannerModel" style="width: 140px;">
+                        <option value="qwen2.5:3b">qwen2.5:3b</option>
+                        <option value="qwen2.5:7b">qwen2.5:7b</option>
+                        <option value="llama3.1:8b">llama3.1:8b</option>
+                    </select>
+                    <select id="coderModel" style="width: 140px;">
+                        <option value="qwen2.5-coder:7b">qwen2.5-coder:7b</option>
+                        <option value="qwen2.5-coder:14b">qwen2.5-coder:14b</option>
+                        <option value="deepseek-coder:6.7b">deepseek-coder:6.7b</option>
+                    </select>
+                </div>
+                <div style="display: flex; gap: 0.5rem;">
+                    <button class="btn btn-primary" id="startBtn" onclick="startAgent()">Start Agent</button>
+                    <button class="btn btn-danger" id="stopBtn" onclick="stopAgent()" disabled>Stop</button>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>Add Goal</h2>
+                <div class="input-group">
+                    <input type="text" id="goalInput" placeholder="Goal description...">
+                    <input type="number" id="goalPriority" placeholder="Priority" value="5" min="1" max="10" style="width: 80px;">
+                </div>
+                <button class="btn btn-primary" onclick="addGoal()" style="width: 100%;" disabled id="addGoalBtn">Add Goal</button>
+            </div>
+
+            <div class="section">
+                <h2>Quick Stats</h2>
+                <div class="stats-grid" id="statsGrid">
+                    <div class="stat-card"><div class="stat-value" id="statGoals">0</div><div class="stat-label">Goals</div></div>
+                    <div class="stat-card"><div class="stat-value" id="statTasks">0</div><div class="stat-label">Tasks</div></div>
+                    <div class="stat-card"><div class="stat-value" id="statCompleted">0</div><div class="stat-label">Completed</div></div>
+                    <div class="stat-card"><div class="stat-value" id="statIterations">0</div><div class="stat-label">Iterations</div></div>
+                </div>
+            </div>
+        </aside>
+
+        <main class="main">
+            <div class="tabs">
+                <button class="tab-btn active" onclick="showTab('goals')">Goals</button>
+                <button class="tab-btn" onclick="showTab('tasks')">Tasks</button>
+                <button class="tab-btn" onclick="showTab('files')">Files</button>
+                <button class="tab-btn" onclick="showTab('memory')">Memory</button>
+                <button class="tab-btn" onclick="showTab('logs')">Logs</button>
+            </div>
+
+            <div id="tab-goals" class="tab active">
+                <div class="section">
+                    <h2>Goals</h2>
+                    <div class="goal-list" id="goalsList">No goals yet</div>
+                </div>
+            </div>
+
+            <div id="tab-tasks" class="tab">
+                <div class="section">
+                    <h2>Tasks</h2>
+                    <div class="task-list" id="tasksList">No tasks yet</div>
+                </div>
+            </div>
+
+            <div id="tab-files" class="tab">
+                <div class="section">
+                    <h2>Generated Files</h2>
+                    <button class="btn btn-primary" onclick="refreshFiles()" style="margin-bottom: 1rem;">Refresh</button>
+                    <div class="file-tree" id="fileTree">No files generated</div>
+                </div>
+            </div>
+
+            <div id="tab-memory" class="tab">
+                <div class="section">
+                    <h2>Project Memory</h2>
+                    <div class="input-group">
+                        <input type="text" id="memoryQuery" placeholder="Search memory..." style="flex: 1;">
+                        <button class="btn btn-primary" onclick="searchMemory()">Search</button>
+                    </div>
+                    <div class="task-list" id="memoryResults">No memory entries</div>
+                </div>
+            </div>
+
+            <div id="tab-logs" class="tab">
+                <div class="section">
+                    <h2>Real-time Logs</h2>
+                    <div id="logsList" style="max-height: 500px; overflow-y: auto;"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- File View Modal -->
+    <div class="modal" id="fileModal">
+        <div class="modal-content">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h3 id="modalFilePath">File</h3>
+                <button onclick="closeModal()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer;">&times;</button>
+            </div>
+            <pre class="file-content" id="fileContent"></pre>
+        </div>
+    </div>
+
+    <script>
+        const ws = new WebSocket(`ws://${location.host}/ws`);
+        let agentRunning = false;
+
+        ws.onopen = () => console.log('WebSocket connected');
+        ws.onclose = () => console.log('WebSocket disconnected');
+        ws.onmessage = (event) => {
+            const msg = JSON.parse(event.data);
+            handleMessage(msg);
+        };
+
+        function handleMessage(msg) {
+            switch (msg.type) {
+                case 'status_update':
+                    updateStatus(msg.data);
+                    break;
+                case 'goal_complete':
+                    addLog('success', `Goal completed: ${msg.data.description}`);
+                    break;
+                case 'task_complete':
+                    addLog('info', `Task completed: ${msg.data.description} (${msg.data.agent_type})`);
+                    break;
+                case 'task_error':
+                    addLog('error', `Task failed: ${msg.data.description} - ${msg.data.error}`);
+                    break;
+                case 'agent_finished':
+                    addLog('success', 'Agent finished');
+                    agentRunning = false;
+                    updateUI();
+                    break;
+                case 'agent_error':
+                    addLog('error', `Agent error: ${msg.data.error}`);
+                    agentRunning = false;
+                    updateUI();
+                    break;
+            }
+        }
+
+        function updateStatus(data) {
+            document.getElementById('statGoals').textContent = data.goals_total || 0;
+            document.getElementById('statTasks').textContent = data.tasks_total || 0;
+            document.getElementById('statCompleted').textContent = data.goals_completed || 0;
+            document.getElementById('statIterations').textContent = data.iteration || 0;
+
+            const badge = document.getElementById('statusBadge');
+            if (data.running) {
+                badge.textContent = 'Running';
+                badge.className = 'status-badge status-running';
+                agentRunning = true;
+            } else {
+                badge.textContent = 'Stopped';
+                badge.className = 'status-badge status-stopped';
+                agentRunning = false;
+            }
+            updateUI();
+            renderGoals(data.goals);
+            renderTasks(data);
+        }
+
+        function updateUI() {
+            document.getElementById('startBtn').disabled = agentRunning;
+            document.getElementById('stopBtn').disabled = !agentRunning;
+            document.getElementById('addGoalBtn').disabled = !agentRunning;
+        }
+
+        function renderGoals(goals) {
+            const container = document.getElementById('goalsList');
+            if (!goals || Object.keys(goals).length === 0) {
+                container.innerHTML = 'No goals yet';
+                return;
+            }
+            container.innerHTML = Object.values(goals).map(g => `
+                <div class="goal-item ${g.status}">
+                    <div class="goal-header">
+                        <span class="goal-title">${escapeHtml(g.description)}</span>
+                        <span class="goal-meta">${g.status} • Priority: ${g.priority}</span>
+                    </div>
+                    <div class="goal-meta">Subtasks: ${g.subtasks?.length || 0}</div>
+                </div>
+            `).join('');
+        }
+
+        function renderTasks(data) {
+            const container = document.getElementById('tasksList');
+            if (!data || !data.goals) {
+                container.innerHTML = 'No tasks yet';
+                return;
+            }
+            let allTasks = [];
+            Object.values(data.goals).forEach(g => {
+                if (g.subtasks) {
+                    g.subtasks.forEach(tid => {
+                        const task = data.tasks?.[tid];
+                        if (task) allTasks.push({...task, goalDesc: g.description});
+                    });
+                }
+            });
+            if (allTasks.length === 0) {
+                container.innerHTML = 'No tasks yet';
+                return;
+            }
+            container.innerHTML = allTasks.map(t => `
+                <div class="task-item">
+                    <div class="task-header">
+                        <span>${escapeHtml(t.description)}</span>
+                        <span class="task-agent">${t.agent_type}</span>
+                    </div>
+                    <div class="goal-meta">Status: ${t.status} • Attempts: ${t.attempts}</div>
+                    ${t.error ? `<div style="color: #ef4444; font-size: 0.75rem; margin-top: 0.25rem;">Error: ${escapeHtml(t.error)}</div>` : ''}
+                </div>
+            `).join('');
+        }
+
+        function addLog(level, message) {
+            const container = document.getElementById('logsList');
+            const time = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${level}`;
+            entry.textContent = `[${time}] ${message}`;
+            container.insertBefore(entry, container.firstChild);
+            // Keep only last 100 logs
+            while (container.children.length > 100) {
+                container.removeChild(container.lastChild);
+            }
+        }
+
+        async function startAgent() {
+            const task = document.getElementById('taskInput').value;
+            const plannerModel = document.getElementById('plannerModel').value;
+            const coderModel = document.getElementById('coderModel').value;
+
+            if (!task.trim()) {
+                alert('Please enter a task description');
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/agent/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ task, planner_model: plannerModel, coder_model: coderModel })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    addLog('success', 'Agent started');
+                } else {
+                    addLog('error', `Failed to start: ${data.detail}`);
+                }
+            } catch (e) {
+                addLog('error', `Error: ${e.message}`);
+            }
+        }
+
+        async function stopAgent() {
+            try {
+                await fetch('/api/agent/stop', { method: 'POST' });
+                addLog('warning', 'Agent stop requested');
+            } catch (e) {
+                addLog('error', `Error: ${e.message}`);
+            }
+        }
+
+        async function addGoal() {
+            const description = document.getElementById('goalInput').value;
+            const priority = parseInt(document.getElementById('goalPriority').value);
+            if (!description.trim()) return;
+
+            try {
+                const res = await fetch('/api/agent/goal', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ description, priority })
+                });
+                if (res.ok) {
+                    document.getElementById('goalInput').value = '';
+                    addLog('info', 'Goal added');
+                }
+            } catch (e) {
+                addLog('error', `Error: ${e.message}`);
+            }
+        }
+
+        async function refreshFiles() {
+            try {
+                const res = await fetch('/api/project/files');
+                const data = await res.json();
+                renderFileTree(data.files);
+            } catch (e) {
+                addLog('error', `Error loading files: ${e.message}`);
+            }
+        }
+
+        function renderFileTree(files) {
+            const container = document.getElementById('fileTree');
+            if (!files || files.length === 0) {
+                container.innerHTML = 'No files generated';
+                return;
+            }
+            // Build tree structure
+            const tree = {};
+            files.forEach(f => {
+                const parts = f.path.split('/');
+                let node = tree;
+                parts.forEach((part, i) => {
+                    if (!node[part]) node[part] = i === parts.length - 1 ? f : {};
+                    node = node[part];
+                });
+            });
+            container.innerHTML = renderTreeNode(tree, '');
+        }
+
+        function renderTreeNode(node, prefix) {
+            let html = '<ul>';
+            for (const [key, value] of Object.entries(node)) {
+                const isFile = value && value.size !== undefined;
+                html += `<li${isFile ? ` onclick="openFile('${prefix}${key}')" style="color: #3b82f6;"` : ''}>${escapeHtml(key)}${isFile ? ` (${formatSize(value.size)})` : ''}`;
+                if (!isFile) html += renderTreeNode(value, `${prefix}${key}/`);
+                html += '</li>';
+            }
+            html += '</ul>';
+            return html;
+        }
+
+        async function openFile(path) {
+            try {
+                const res = await fetch(`/api/project/file/${encodeURIComponent(path)}`);
+                const data = await res.json();
+                document.getElementById('modalFilePath').textContent = path;
+                document.getElementById('fileContent').textContent = data.content;
+                document.getElementById('fileModal').classList.add('active');
+            } catch (e) {
+                addLog('error', `Error loading file: ${e.message}`);
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('fileModal').classList.remove('active');
+        }
+
+        async function searchMemory() {
+            const query = document.getElementById('memoryQuery').value;
+            if (!query.trim()) return;
+
+            try {
+                const res = await fetch('/api/memory/search', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query, top_k: 20 })
+                });
+                const data = await res.json();
+                renderMemoryResults(data.results);
+            } catch (e) {
+                addLog('error', `Error searching memory: ${e.message}`);
+            }
+        }
+
+        function renderMemoryResults(results) {
+            const container = document.getElementById('memoryResults');
+            if (!results || !results.trim()) {
+                container.innerHTML = 'No results found';
+                return;
+            }
+            container.innerHTML = `<pre style="font-size: 0.75rem; white-space: pre-wrap;">${escapeHtml(results)}</pre>`;
+        }
+
+        function showTab(tabName) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(`tab-${tabName}`).classList.add('active');
+            event.target.classList.add('active');
+            if (tabName === 'files') refreshFiles();
+            if (tabName === 'memory') loadMemoryStats();
+        }
+
+        async function loadMemoryStats() {
+            try {
+                const res = await fetch('/api/memory/stats');
+                const data = await res.json();
+                // Could display stats here
+            } catch (e) {}
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function formatSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        // Initial load
+        fetch('/api/status').then(r => r.json()).then(updateStatus);
+        refreshFiles();
+    </script>
+</body>
+</html>

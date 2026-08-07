@@ -24,7 +24,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+COPY webui/requirements.txt ./webui-requirements.txt
+COPY memory_server/requirements.txt ./memory-server-requirements.txt
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt \
+    && pip install --no-cache-dir --prefix=/install -r webui-requirements.txt \
+    && pip install --no-cache-dir --prefix=/install -r memory-server-requirements.txt
 
 # ── Stage 2: runtime ──────────────────────────────────────────────────────────
 FROM python:3.13-slim
@@ -54,11 +58,13 @@ COPY --from=builder /install /usr/local
 COPY . .
 
 # Create output directory
-RUN mkdir -p /app/output
+RUN mkdir -p /app/output /app/memory_data
 
-# Entrypoint script
+# Entrypoint scripts
 COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+COPY webui/entrypoint.sh /webui-entrypoint.sh
+COPY memory_server/entrypoint.sh /memory-server-entrypoint.sh
+RUN chmod +x /entrypoint.sh /webui-entrypoint.sh /memory-server-entrypoint.sh
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -69,6 +75,10 @@ ENV PYTHONUNBUFFERED=1 \
     AGENTFORGE_MAX_ITERATIONS=50 \
     AGENTFORGE_LANGUAGE= \
     AGENTFORGE_POLYGLOT=false \
-    AGENTFORGE_INTEGRATION=false
+    AGENTFORGE_INTEGRATION=false \
+    # v1.1 defaults
+    AGENTFORGE_WEBUI_PORT=8080 \
+    AGENTFORGE_MEMORY_SERVER_PORT=8081 \
+    AGENTFORGE_MEMORY_SERVER_DATA_DIR=/app/memory_data
 
 ENTRYPOINT ["/entrypoint.sh"]

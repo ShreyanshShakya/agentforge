@@ -206,7 +206,150 @@ docker compose up --build
 
 Generated files appear in `./output/project/` on the host (volume-mounted).
 
-### Deploy to AWS EC2
+---
+
+## 🆕 v1.1: Web UI, Git Integration & Team Memory
+
+### 🌐 Web UI Dashboard
+
+Real-time monitoring interface for autonomous agent progress:
+
+```bash
+# Start all services (includes Web UI at http://localhost:8080)
+docker compose up --build
+
+# Or run Web UI standalone
+python -m uvicorn webui.main:app --host 0.0.0.0 --port 8080
+```
+
+**Features:**
+- **Live agent status** — iterations, goals, tasks, memory stats
+- **Real-time logs** — WebSocket stream of agent activity
+- **Goal/Task management** — add goals, view progress, inspect task details
+- **File browser** — explore generated project files with syntax highlighting
+- **Memory explorer** — search and view project memory entries
+- **One-click controls** — start/stop agent, add goals, refresh files
+
+![Web UI](https://via.placeholder.com/800x400/1a1a2e/ffffff?text=AgentForge+Web+UI+Dashboard)
+
+### 🔧 Git Integration
+
+Automatic commit/push of generated code:
+
+```python
+from utils.git_integration import auto_commit_generated, GitIntegration, GitConfig
+
+# Simple one-liner
+success, msg = auto_commit_generated(
+    message="feat: add user authentication",
+    push=True,
+    repo_url="git@github.com:user/repo.git"
+)
+
+# Or use the full API for autonomous agent callbacks
+git = GitIntegration(project_dir, GitConfig(
+    repo_url="git@github.com:user/repo.git",
+    branch="main",
+    auto_push=True
+))
+
+callbacks = GitAgentCallbacks(git, commit_on_goal=True, commit_on_iteration=5)
+# Attach to autonomous agent...
+```
+
+**Features:**
+- Auto-commit on goal completion
+- Periodic commits during long-running autonomous sessions
+- Configurable commit messages with templates
+- SSH key support for private repos
+- Branch management (create, checkout, merge)
+- Diff viewing and conflict detection
+
+### 🧠 Team Memory Server
+
+Centralized memory sharing across team members and CI/CD pipelines:
+
+```bash
+# Start memory server (runs on port 8081)
+docker compose up memory-server
+
+# Or standalone
+python -m uvicorn memory_server.main:app --host 0.0.0.0 --port 8081
+```
+
+**REST API:**
+```bash
+# Create memory entry
+curl -X POST http://localhost:8081/api/projects/my-project/entries \
+  -H "Content-Type: application/json" \
+  -d '{"category": "decision", "content": "Use PostgreSQL for persistence", "metadata": {"author": "alice"}}'
+
+# Search memories
+curl -X POST http://localhost:8081/api/projects/my-project/search \
+  -H "Content-Type: application/json" \
+  -d '{"query": "database decision", "top_k": 5}'
+
+# Sync from local (for offline-first clients)
+curl -X POST http://localhost:8081/api/projects/my-project/sync \
+  -H "Content-Type: application/json" \
+  -d '{"entries": [...], "project_id": "my-project"}'
+```
+
+**WebSocket Real-time Sync:**
+```javascript
+const ws = new WebSocket('ws://localhost:8081/ws/my-project');
+ws.onmessage = (event) => {
+  const msg = JSON.parse(event.data);
+  if (msg.type === 'entry_created') {
+    console.log('New memory:', msg.entry);
+  }
+};
+```
+
+**Features:**
+- Multi-project isolation
+- Vector embedding search (nomic-embed-text via Ollama)
+- Real-time WebSocket subscriptions
+- Conflict detection & resolution for distributed sync
+- Offline-first sync protocol
+- Role-based access control (planned)
+
+### 🐳 v1.1: Full Docker Compose Stack
+
+```bash
+# Start everything: Ollama + AgentForge + Web UI + Memory Server
+docker compose up --build
+
+# Services:
+# - http://localhost:11434  — Ollama API
+# - http://localhost:8080   — Web UI Dashboard
+# - http://localhost:8081   — Memory Server API
+# - AgentForge runs as batch job
+```
+
+**Environment Variables:**
+```bash
+# Web UI
+AGENTFORGE_WEBUI_PORT=8080
+
+# Memory Server
+AGENTFORGE_MEMORY_SERVER_PORT=8081
+AGENTFORGE_MEMORY_SERVER_DATA_DIR=/app/memory_data
+
+# Git (for auto-commit)
+AGENTFORGE_GIT_REPO_URL=git@github.com:user/repo.git
+AGENTFORGE_GIT_BRANCH=main
+AGENTFORGE_GIT_AUTO_PUSH=true
+```
+
+### Deploy to AWS EC2 (v1.1)
+
+```bash
+# The deploy.sh script now syncs all v1.1 services
+bash deploy.sh "Build a full-stack app with React and Go"
+```
+
+The EC2 instance will run all four containers (ollama, agentforge, webui, memory-server) with persistent volumes for outputs and memory data.
 
 See `infra/user-data.sh` for the EC2 bootstrap script (installs Docker, sets up the project).
 
@@ -476,16 +619,29 @@ agentforge/
 │   ├── file_writer.py
 │   ├── executor.py
 │   ├── language.py           # 🆕 v1.0: multi-language config & utilities
-│   └── memory.py             # 🆕 v1.0: vector memory store with embeddings
+│   ├── memory.py             # 🆕 v1.0: vector memory store with embeddings
+│   └── git_integration.py    # 🆕 v1.1: Git commit/push automation
+│
+├── webui/                    # 🆕 v1.1: Web UI Dashboard
+│   ├── main.py               # FastAPI + WebSocket server
+│   ├── templates/index.html  # Real-time dashboard
+│   ├── requirements.txt
+│   └── entrypoint.sh
+│
+├── memory_server/            # 🆕 v1.1: Central Memory Server
+│   ├── main.py               # FastAPI + WebSocket server
+│   ├── requirements.txt
+│   └── entrypoint.sh
 │
 ├── infra/
 │   ├── user-data.sh          # EC2 bootstrap (Docker install)
 │   └── block-devices.json    # EBS volume spec for aws ec2 run-instances
 │
 ├── Dockerfile                # Multi-stage Python 3.13 image (with all language runtimes)
-├── docker-compose.yml        # agentforge + ollama sidecar
+├── docker-compose.yml        # ollama + agentforge + webui + memory-server
 ├── entrypoint.sh             # Wait for Ollama, pull models, run pipeline
-└── deploy.sh                 # Sync + redeploy to existing EC2 instance
+├── deploy.sh                 # Sync + redeploy to existing EC2 instance
+└── webui-entrypoint.sh       # Web UI container entrypoint
 ```
 
 ---
@@ -573,9 +729,14 @@ python main.py "Build a FastAPI Todo API" --integration
 - [x] CLI integration — `--autonomous`, `--language`, `--polyglot`, `--memory-*` flags
 - [x] Docker support — all language runtimes, v1.0 env vars, embedding model pull
 
-### v1.1 (planned)
-- [ ] Web UI for monitoring autonomous agent progress
-- [ ] Git integration — commit/push generated code
-- [ ] Team memory sharing — central memory server
+### v1.1 ✅
+- [x] Web UI for monitoring autonomous agent progress — real-time dashboard with WebSocket (`webui/`)
+- [x] Git integration — auto-commit/push generated code (`utils/git_integration.py`)
+- [x] Team memory sharing — central memory server with WebSocket sync (`memory_server/`)
+- [x] Docker Compose — multi-service deployment with webui, memory-server, agentforge, ollama
+
+### v1.2 (planned)
 - [ ] More languages — PHP, Ruby, Swift, Kotlin
 - [ ] Plugin system for custom agents
+- [ ] VS Code / JetBrains IDE integration
+- [ ] GitHub/GitLab/Gitea webhook integration

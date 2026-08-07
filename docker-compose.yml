@@ -25,7 +25,7 @@ services:
     #           count: all
     #           capabilities: [gpu]
 
-  # ── AgentForge pipeline ─────────────────────────────────────────────────────
+  # ── AgentForge Pipeline ─────────────────────────────────────────────────────
   agentforge:
     build:
       context: .
@@ -49,9 +49,55 @@ services:
       AGENTFORGE_INTEGRATION: ${AGENTFORGE_INTEGRATION:-false}
       AGENTFORGE_INITIAL_GOAL: ${AGENTFORGE_INITIAL_GOAL:-}
       AGENTFORGE_PROJECT_ID: ${AGENTFORGE_PROJECT_ID:-}
+      # v1.1 features
+      AGENTFORGE_WEBUI_PORT: ${AGENTFORGE_WEBUI_PORT:-8080}
+      AGENTFORGE_MEMORY_SERVER_PORT: ${AGENTFORGE_MEMORY_SERVER_PORT:-8081}
+      AGENTFORGE_MEMORY_SERVER_DATA_DIR: ${AGENTFORGE_MEMORY_SERVER_DATA_DIR:-/app/memory_data}
     volumes:
       - ./output:/app/output    # expose generated project to host
+      - ./memory_data:/app/memory_data  # persist memory server data
     restart: "no"               # run once, do not loop
+
+  # ── AgentForge Web UI ───────────────────────────────────────────────────────
+  webui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: agentforge-webui
+    command: /webui-entrypoint.sh
+    depends_on:
+      ollama:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+      AGENTFORGE_WEBUI_PORT: ${AGENTFORGE_WEBUI_PORT:-8080}
+      AGENTFORGE_MEMORY_SERVER_URL: http://memory-server:8081
+    volumes:
+      - ./output:/app/output
+      - ./memory_data:/app/memory_data
+    restart: unless-stopped
+
+  # ── AgentForge Memory Server ────────────────────────────────────────────────
+  memory-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: agentforge-memory
+    command: /memory-server-entrypoint.sh
+    depends_on:
+      ollama:
+        condition: service_healthy
+    ports:
+      - "8081:8081"
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+      AGENTFORGE_MEMORY_SERVER_PORT: ${AGENTFORGE_MEMORY_SERVER_PORT:-8081}
+      AGENTFORGE_MEMORY_SERVER_DATA_DIR: ${AGENTFORGE_MEMORY_SERVER_DATA_DIR:-/app/memory_data}
+    volumes:
+      - ./memory_data:/app/memory_data
+    restart: unless-stopped
 
 
 volumes:
