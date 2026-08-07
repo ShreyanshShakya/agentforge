@@ -1,4 +1,4 @@
-# Agentic Codex (v0.7.0)
+# Agentic Codex (v1.0.0)
 
 ## ⭐ Highlights
 
@@ -15,6 +15,9 @@
 - **Runtime integration testing** — runs generated projects and validates they start cleanly
 - **API endpoint validation** — auto-discovers and hits FastAPI/Flask routes, asserts HTTP 2xx
 - **Dependency resolution** — installs `requirements.txt` into an isolated venv before tests
+- **🆕 Autonomous agent** — continuous goal-driven operation with self-decomposition
+- **🆕 Multi-language support** — Python, JavaScript, TypeScript, Go, Rust, Java, C#
+- **🆕 Long-term project memory** — vector embeddings with semantic search across runs
 
 Agentic Codex is an advanced, fully autonomous AI software engineering pipeline. Instead of a single LLM trying to write an entire project at once, Agentic Codex breaks down the software development lifecycle into specialized, distinct agents. The system is entirely self-healing—capable of catching its own syntax errors, broken imports, and failed unit tests, and intelligently repairing its own code.
 
@@ -90,19 +93,113 @@ python main.py "..." --output-dir /path/to/my/output
 python main.py "..." --log-level DEBUG
 ```
 
+### 🆕 v1.0: Autonomous Mode
+
+Run continuously, decomposing high-level goals into tasks and executing them:
+
+```bash
+# Autonomous mode with initial goal
+python main.py --autonomous "Build and maintain a REST API with auth" --max-iterations 50
+
+# With custom project ID for memory isolation
+python main.py --autonomous "Build a TODO app" --project-id my-todo-app --max-iterations 100
+```
+
+### 🆕 v1.0: Multi-Language Support
+
+Generate projects in any supported language (auto-detected or explicit):
+
+```bash
+# Explicit language
+python main.py --language go "Create a Go HTTP server"
+python main.py --language typescript "Build a React dashboard"
+python main.py --language rust "Create a CLI tool"
+python main.py --language java "Build a Spring Boot REST API"
+python main.py --language csharp "Create a .NET Web API"
+python main.py --language javascript "Build a Node.js Express server"
+
+# Polyglot: multi-language project (e.g. frontend + backend)
+python main.py --polyglot --language typescript "Build a full-stack app with React frontend and Go backend"
+
+# List supported languages
+python main.py --list-languages
+```
+
+### 🆕 v1.0: Long-Term Memory
+
+Persist and query project knowledge across runs:
+
+```bash
+# Show memory stats
+python main.py --memory-stats --project-id my-project
+
+# Export memory for backup/sharing
+python main.py --memory-export backup.json --project-id my-project
+
+# Import memory into new project
+python main.py --memory-import backup.json --project-id new-project
+
+# Clear memory
+python main.py --memory-clear --project-id my-project
+```
+
 ---
 
 ## 🐳 Docker / AWS Deployment
 
-A full Docker Compose setup ships with the project. It runs Ollama and AgentForge as two containers, wired together automatically.
+A full Docker Compose setup ships with the project. It runs Ollama and AgentForge as two containers, wired together automatically. The Docker image includes all language runtimes (Node.js, Go, Rust, Java, .NET) for multi-language support.
 
 ### Run locally with Docker Compose
 
 ```bash
-# Set your task (default: "Build a simple FastAPI Hello World API.")
+# Standard pipeline (default: FastAPI Hello World)
 export AGENTFORGE_TASK="Build a REST API."
 export AGENTFORGE_PLANNER_MODEL="qwen2.5:3b"
 export AGENTFORGE_CODER_MODEL="qwen2.5-coder:7b"
+
+docker compose up --build
+```
+
+### 🆕 v1.0: Docker with Autonomous Mode
+
+```bash
+# Autonomous agent
+export AGENTFORGE_AUTONOMOUS=true
+export AGENTFORGE_TASK="Build and maintain a REST API"
+export AGENTFORGE_MAX_ITERATIONS=50
+export AGENTFORGE_PROJECT_ID=my-api-project
+
+docker compose up --build
+```
+
+### 🆕 v1.0: Docker with Multi-Language
+
+```bash
+# Go project
+export AGENTFORGE_TASK="Create a Go HTTP server with JSON API"
+export AGENTFORGE_LANGUAGE=go
+
+docker compose up --build
+
+# TypeScript project
+export AGENTFORGE_TASK="Build a React dashboard with TypeScript"
+export AGENTFORGE_LANGUAGE=typescript
+
+docker compose up --build
+
+# Polyglot (multi-language) project
+export AGENTFORGE_POLYGLOT=true
+export AGENTFORGE_LANGUAGE=typescript
+export AGENTFORGE_TASK="Build a full-stack app with React frontend and Go backend"
+
+docker compose up --build
+```
+
+### 🆕 v1.0: Docker with Integration Testing
+
+```bash
+export AGENTFORGE_INTEGRATION=true
+export AGENTFORGE_TASK="Build a FastAPI Todo API with JWT auth"
 
 docker compose up --build
 ```
@@ -254,6 +351,92 @@ All settings live in `config.py`. Key tunables:
 | `OUTPUT_DIR` | `./output` | Root output directory |
 | `LOG_LEVEL` | `INFO` | Logging verbosity |
 
+### 🆕 v1.0 Configuration
+
+| Setting | Default | Description |
+|---|---|---|
+| `AUTONOMOUS_MAX_ITERATIONS` | `50` | Max autonomous loop iterations |
+| `AUTONOMOUS_GOAL_TIMEOUT` | `300` | Goal timeout in seconds |
+| `AUTONOMOUS_IDLE_THRESHOLD` | `3` | Idle cycles before proposing new goals |
+| `SUPPORTED_LANGUAGES` | 7 langs | Python, JS, TS, Go, Rust, Java, C# |
+| `DEFAULT_LANGUAGE` | `python` | Default language for generation |
+| `MEMORY_DIR` | `./output/memory` | Memory persistence directory |
+| `MEMORY_EMBEDDINGS_MODEL` | `nomic-embed-text` | Ollama embedding model |
+| `MEMORY_MAX_ENTRIES` | `10000` | Max memory entries per project |
+| `MEMORY_SIMILARITY_THRESHOLD` | `0.75` | Min cosine similarity for recall |
+| `MEMORY_TTL_DAYS` | `90` | Entry time-to-live |
+
+---
+
+## 🆕 v1.0: Autonomous Software Engineering Agent
+
+The `AutonomousAgent` runs a continuous loop that:
+1. **Decomposes goals** into executable tasks using the Planner agent
+2. **Executes tasks** with appropriate specialized agents (coder, tester, etc.)
+3. **Learns from results** — stores successful patterns and error fixes in memory
+4. **Proposes new goals** when idle (technical debt, missing tests, documentation)
+5. **Persists state** across iterations for resumable operation
+
+**Architecture:**
+```
+Goal Queue → Decompose → Task Queue → Execute → Validate → Learn → Repeat
+                    ↓                              ↑
+              Memory Store ←←←←←←←←←←←←←←←←←←←←←←←←←
+```
+
+**Key features:**
+- Priority-based goal scheduling
+- Persistent repair memory (prevents repeating failed fixes)
+- Cross-run learning via vector embeddings
+- Configurable iteration limits and timeouts
+- Callbacks for monitoring progress
+
+---
+
+## 🆕 v1.0: Multi-Language Support
+
+First-class support for 7 programming languages with auto-detection:
+
+| Language | Extensions | Test Framework | Package Manager | Config Files |
+|---|---|---|---|---|
+| **Python** | `.py` | pytest | pip | `requirements.txt`, `pyproject.toml` |
+| **JavaScript** | `.js`, `.jsx`, `.mjs` | jest | npm | `package.json` |
+| **TypeScript** | `.ts`, `.tsx` | jest | npm | `package.json`, `tsconfig.json` |
+| **Go** | `.go` | go test | go mod | `go.mod`, `go.sum` |
+| **Rust** | `.rs` | cargo test | cargo | `Cargo.toml` |
+| **Java** | `.java` | junit | maven/gradle | `pom.xml`, `build.gradle` |
+| **C#** | `.cs` | dotnet test | nuget | `*.csproj`, `*.sln` |
+
+**Auto-detection** checks for config files first, then file extensions in the project.
+
+**Polyglot File Planner** generates correct project structure per language:
+- Proper directory layouts (e.g., `cmd/` for Go, `src/main/java/` for Java)
+- Language-specific config files
+- Correct test file naming conventions (`test_*.py`, `*_test.go`, `*.test.ts`)
+- Dependency-aware file ordering
+
+---
+
+## 🆕 v1.0: Long-Term Project Memory
+
+Vector-embedding-based memory store for cross-run learning:
+
+**Memory Categories:**
+- `decision` — Architecture/design decisions with rationale
+- `code_pattern` — Reusable code snippets per language
+- `error_fix` — Errors and their successful fixes
+- `architecture` — System architecture records
+- `requirement` — Project requirements with priority
+
+**How it works:**
+1. On each run, relevant memories are retrieved via semantic search (cosine similarity)
+2. Context is injected into agent prompts for informed generation
+3. Successful patterns and fixes are stored automatically
+4. Memories persist in `output/memory/<project_id>.jsonl` with embeddings
+5. Export/import for backup and team sharing
+
+**Embedding model:** `nomic-embed-text` (via Ollama) — runs locally, no API keys needed.
+
 ---
 
 ## 📁 Project Structure
@@ -271,13 +454,15 @@ agentforge/
 │   ├── critic.py
 │   ├── planner.py
 │   ├── consensus.py
-│   ├── file_planner.py
+│   ├── file_planner.py       # Original Python-only file planner
 │   ├── coder.py
 │   ├── fixer.py
 │   ├── import_validator.py
 │   ├── test_generator.py
 │   ├── dependency_agent.py   # v0.7: installs requirements.txt into .venv
-│   └── validator.py
+│   ├── validator.py
+│   ├── autonomous_agent.py   # 🆕 v1.0: continuous goal-driven agent
+│   └── polyglot_file_planner.py  # 🆕 v1.0: multi-language file planner
 │
 ├── pipeline/
 │   ├── generator.py          # Parallel generation + stateful fixer loop
@@ -289,13 +474,15 @@ agentforge/
 │   ├── compiler.py           # py_compile syntax check
 │   ├── json_parser.py        # Robust JSON extraction from LLM output
 │   ├── file_writer.py
-│   └── executor.py
+│   ├── executor.py
+│   ├── language.py           # 🆕 v1.0: multi-language config & utilities
+│   └── memory.py             # 🆕 v1.0: vector memory store with embeddings
 │
 ├── infra/
 │   ├── user-data.sh          # EC2 bootstrap (Docker install)
 │   └── block-devices.json    # EBS volume spec for aws ec2 run-instances
 │
-├── Dockerfile                # Multi-stage Python 3.13 image
+├── Dockerfile                # Multi-stage Python 3.13 image (with all language runtimes)
 ├── docker-compose.yml        # agentforge + ollama sidecar
 ├── entrypoint.sh             # Wait for Ollama, pull models, run pipeline
 └── deploy.sh                 # Sync + redeploy to existing EC2 instance
@@ -379,7 +566,16 @@ Enable the integration phase with:
 python main.py "Build a FastAPI Todo API" --integration
 ```
 
-### v1.0
-- [ ] Autonomous software engineering agent
-- [ ] Multi-language support
-- [ ] Long-term project memory
+### v1.0 ✅
+- [x] Autonomous software engineering agent — continuous goal-driven operation (`agents/autonomous_agent.py`)
+- [x] Multi-language support — Python, JS, TS, Go, Rust, Java, C# (`utils/language.py`, `agents/polyglot_file_planner.py`)
+- [x] Long-term project memory — vector embeddings with semantic recall (`utils/memory.py`)
+- [x] CLI integration — `--autonomous`, `--language`, `--polyglot`, `--memory-*` flags
+- [x] Docker support — all language runtimes, v1.0 env vars, embedding model pull
+
+### v1.1 (planned)
+- [ ] Web UI for monitoring autonomous agent progress
+- [ ] Git integration — commit/push generated code
+- [ ] Team memory sharing — central memory server
+- [ ] More languages — PHP, Ruby, Swift, Kotlin
+- [ ] Plugin system for custom agents

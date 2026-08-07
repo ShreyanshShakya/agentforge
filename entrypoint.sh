@@ -7,6 +7,15 @@ CODER_MODEL="${AGENTFORGE_CODER_MODEL:-qwen2.5-coder:7b}"
 TASK="${AGENTFORGE_TASK:-Build a simple FastAPI Hello World API.}"
 WORKERS="${AGENTFORGE_WORKERS:-2}"
 
+# v1.0 features
+AUTONOMOUS="${AGENTFORGE_AUTONOMOUS:-false}"
+MAX_ITERATIONS="${AGENTFORGE_MAX_ITERATIONS:-50}"
+LANGUAGE="${AGENTFORGE_LANGUAGE:-}"
+POLYGLOT="${AGENTFORGE_POLYGLOT:-false}"
+INTEGRATION="${AGENTFORGE_INTEGRATION:-false}"
+INITIAL_GOAL="${AGENTFORGE_INITIAL_GOAL:-}"
+PROJECT_ID="${AGENTFORGE_PROJECT_ID:-}"
+
 # ── 1. Wait for Ollama to be ready (Python, no curl needed) ───────────────────
 echo "[entrypoint] Waiting for Ollama at $OLLAMA_HOST ..."
 MAX_WAIT=120
@@ -58,15 +67,47 @@ if [ "$CODER_MODEL" != "$PLANNER_MODEL" ]; then
     pull_model "$CODER_MODEL"
 fi
 
+# Pull embedding model for memory
+pull_model "nomic-embed-text"
+
 # ── 3. Run AgentForge pipeline ────────────────────────────────────────────────
 echo "[entrypoint] Starting AgentForge pipeline..."
 echo "[entrypoint]   Task           : $TASK"
 echo "[entrypoint]   Planner model  : $PLANNER_MODEL"
 echo "[entrypoint]   Coder model    : $CODER_MODEL"
 echo "[entrypoint]   Workers        : $WORKERS"
+echo "[entrypoint]   Autonomous     : $AUTONOMOUS"
+echo "[entrypoint]   Language       : ${LANGUAGE:-auto}"
+echo "[entrypoint]   Polyglot       : $POLYGLOT"
+echo "[entrypoint]   Integration    : $INTEGRATION"
 
-exec python main.py "$TASK" \
-    --planner-model "$PLANNER_MODEL" \
-    --coder-model   "$CODER_MODEL" \
-    --workers       "$WORKERS" \
-    --log-level     INFO
+ARGS=""
+
+if [ "$AUTONOMOUS" = "true" ]; then
+    ARGS="$ARGS --autonomous --max-iterations $MAX_ITERATIONS"
+    if [ -n "$INITIAL_GOAL" ]; then
+        ARGS="$ARGS --initial-goal \"$INITIAL_GOAL\""
+    fi
+    if [ -n "$PROJECT_ID" ]; then
+        ARGS="$ARGS --project-id \"$PROJECT_ID\""
+    fi
+else
+    ARGS="$ARGS \"$TASK\""
+fi
+
+if [ -n "$LANGUAGE" ]; then
+    ARGS="$ARGS --language $LANGUAGE"
+fi
+
+if [ "$POLYGLOT" = "true" ]; then
+    ARGS="$ARGS --polyglot"
+fi
+
+if [ "$INTEGRATION" = "true" ]; then
+    ARGS="$ARGS --integration"
+fi
+
+ARGS="$ARGS --planner-model \"$PLANNER_MODEL\" --coder-model \"$CODER_MODEL\" --workers \"$WORKERS\" --log-level INFO"
+
+echo "[entrypoint] Running: python main.py $ARGS"
+exec python main.py $ARGS

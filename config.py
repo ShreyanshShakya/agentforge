@@ -69,3 +69,102 @@ MAX_WORKERS        = 4      # ThreadPoolExecutor workers for parallel generation
 LOG_LEVEL  = "INFO"   # DEBUG | INFO | WARNING | ERROR
 LOG_FORMAT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 LOG_DATE   = "%H:%M:%S"
+
+# ─── v1.0: Autonomous Agent Settings ──────────────────────────────────────────
+
+AUTONOMOUS_MAX_ITERATIONS   = 50      # Max autonomous loop iterations
+AUTONOMOUS_GOAL_TIMEOUT     = 300     # Seconds before goal times out
+AUTONOMOUS_IDLE_THRESHOLD   = 3       # Idle cycles before proposing new tasks
+
+# ─── v1.0: Multi-Language Support ─────────────────────────────────────────────
+
+SUPPORTED_LANGUAGES = {
+    "python": {
+        "extensions": [".py"],
+        "test_pattern": "test_*.py",
+        "test_framework": "pytest",
+        "build_cmd": None,
+        "run_cmd": "python",
+        "package_manager": "pip",
+        "config_files": ["requirements.txt", "pyproject.toml", "setup.py"],
+        "validator": "python",
+    },
+    "javascript": {
+        "extensions": [".js", ".jsx", ".mjs"],
+        "test_pattern": "*.test.js",
+        "test_framework": "jest",
+        "build_cmd": None,
+        "run_cmd": "node",
+        "package_manager": "npm",
+        "config_files": ["package.json"],
+        "validator": "node",
+    },
+    "typescript": {
+        "extensions": [".ts", ".tsx"],
+        "test_pattern": "*.test.ts",
+        "test_framework": "jest",
+        "build_cmd": "tsc",
+        "run_cmd": "node",
+        "package_manager": "npm",
+        "config_files": ["package.json", "tsconfig.json"],
+        "validator": "tsc",
+    },
+    "go": {
+        "extensions": [".go"],
+        "test_pattern": "*_test.go",
+        "test_framework": "go test",
+        "build_cmd": "go build",
+        "run_cmd": "go run",
+        "package_manager": "go mod",
+        "config_files": ["go.mod", "go.sum"],
+        "validator": "go vet",
+    },
+    "rust": {
+        "extensions": [".rs"],
+        "test_pattern": "*_test.rs",
+        "test_framework": "cargo test",
+        "build_cmd": "cargo build",
+        "run_cmd": "cargo run",
+        "package_manager": "cargo",
+        "config_files": ["Cargo.toml"],
+        "validator": "cargo check",
+    },
+    "java": {
+        "extensions": [".java"],
+        "test_pattern": "*Test.java",
+        "test_framework": "junit",
+        "build_cmd": "mvn compile",
+        "run_cmd": "java",
+        "package_manager": "maven",
+        "config_files": ["pom.xml", "build.gradle"],
+        "validator": "javac",
+    },
+    "csharp": {
+        "extensions": [".cs"],
+        "test_pattern": "*Tests.cs",
+        "test_framework": "dotnet test",
+        "build_cmd": "dotnet build",
+        "run_cmd": "dotnet run",
+        "package_manager": "nuget",
+        "config_files": ["*.csproj", "*.sln"],
+        "validator": "dotnet build",
+    },
+}
+
+DEFAULT_LANGUAGE = "python"
+LANGUAGE_DETECTION_ENABLED = True
+
+# ─── v1.0: Long-Term Project Memory ───────────────────────────────────────────
+
+MEMORY_DIR           = OUTPUT_DIR / "memory"
+MEMORY_VECTOR_STORE  = MEMORY_DIR / "vectors"
+MEMORY_EMBEDDINGS_MODEL = "nomic-embed-text"  # Ollama embedding model
+MEMORY_MAX_ENTRIES   = 10000
+MEMORY_SIMILARITY_THRESHOLD = 0.75
+MEMORY_TTL_DAYS      = 90
+MEMORY_AUTO_SAVE     = True
+
+# ─── Paths (extended) ──────────────────────────────────────────────────────────
+
+MEMORY_DIR.mkdir(parents=True, exist_ok=True)
+MEMORY_VECTOR_STORE.mkdir(parents=True, exist_ok=True)

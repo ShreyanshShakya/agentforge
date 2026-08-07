@@ -36,11 +36,19 @@ services:
         condition: service_healthy
     environment:
       OLLAMA_HOST: http://ollama:11434
-      # Override task via env var; default shown below
+      # Standard pipeline options
       AGENTFORGE_TASK: ${AGENTFORGE_TASK:-Build a simple FastAPI Hello World API.}
       AGENTFORGE_PLANNER_MODEL: ${AGENTFORGE_PLANNER_MODEL:-qwen2.5:3b}
       AGENTFORGE_CODER_MODEL: ${AGENTFORGE_CODER_MODEL:-qwen2.5-coder:7b}
       AGENTFORGE_WORKERS: ${AGENTFORGE_WORKERS:-2}
+      # v1.0 features
+      AGENTFORGE_AUTONOMOUS: ${AGENTFORGE_AUTONOMOUS:-false}
+      AGENTFORGE_MAX_ITERATIONS: ${AGENTFORGE_MAX_ITERATIONS:-50}
+      AGENTFORGE_LANGUAGE: ${AGENTFORGE_LANGUAGE:-}
+      AGENTFORGE_POLYGLOT: ${AGENTFORGE_POLYGLOT:-false}
+      AGENTFORGE_INTEGRATION: ${AGENTFORGE_INTEGRATION:-false}
+      AGENTFORGE_INITIAL_GOAL: ${AGENTFORGE_INITIAL_GOAL:-}
+      AGENTFORGE_PROJECT_ID: ${AGENTFORGE_PROJECT_ID:-}
     volumes:
       - ./output:/app/output    # expose generated project to host
     restart: "no"               # run once, do not loop

@@ -1,2 +1,17 @@
+# Core dependencies
 ollama>=0.3.0
 pytest>=8.0.0
+
+# v1.0: Autonomous agent & memory
+# For vector embeddings (using Ollama's nomic-embed-text)
+# For async support
+# For file watching (optional)
+# watchdog>=3.0.0
+
+# Language-specific tools (installed separately per project)
+# python: pytest, black, ruff, mypy
+# javascript/typescript: jest, eslint, prettier, typescript
+# go: go toolchain
+# rust: cargo toolchain
+# java: maven/gradle, junit
+# csharp: dotnet sdk, xunit
