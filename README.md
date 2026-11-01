@@ -1,4 +1,25 @@
-# Agentic Codex (v1.0.0)
+# AgentForge — Local Multi-Agent Software Engineering System
+
+> A local-first, multi-agent coding pipeline that plans software projects, generates files, validates execution, repairs failures, and coordinates specialized agents using Ollama.
+
+<p align="left">
+  <img src="https://img.shields.io/badge/Runtime-Ollama%20Local-111827" alt="Ollama local runtime"/>
+  <img src="https://img.shields.io/badge/Language-Python-3776AB?logo=python&logoColor=white" alt="Python"/>
+  <img src="https://img.shields.io/badge/Agents-Multi--Agent-6C5CE7" alt="Multi-agent"/>
+  <img src="https://img.shields.io/badge/Deployment-Docker-2496ED?logo=docker&logoColor=white" alt="Docker"/>
+</p>
+
+## Project at a glance
+
+| Area | Implementation |
+|---|---|
+| Orchestration | Specialized planning, analysis, architecture, coding, critique, and validation agents |
+| Model runtime | Local Ollama models, selectable at runtime |
+| Generation | Dependency-aware and parallel file generation |
+| Quality loop | Compilation, import, test, API, and runtime validation with repair |
+| Memory | Persistent repair memory and semantic project memory |
+| Interfaces | CLI and monitoring web UI |
+| Deployment | Docker and Docker Compose |
 
 ## ⭐ Highlights
 
