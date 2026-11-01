@@ -251,7 +251,7 @@ python -m uvicorn webui.main:app --host 0.0.0.0 --port 8080
 - **Memory explorer** — search and view project memory entries
 - **One-click controls** — start/stop agent, add goals, refresh files
 
-![Web UI](https://via.placeholder.com/800x400/1a1a2e/ffffff?text=AgentForge+Web+UI+Dashboard)
+<!-- Add a real Web UI screenshot here when a current dashboard capture is available. -->
 
 ### 🔧 Git Integration
 
