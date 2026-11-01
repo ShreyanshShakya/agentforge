@@ -382,99 +382,163 @@ bash deploy.sh "Build a REST API with authentication"
 
 ---
 
-## 🏗️ High-Level Architecture
+## 🏗️ System Architecture
 
-The system operates in two major phases: **System Design** and **Iterative Generation & Testing**.
+AgentForge is a local-first software engineering system built around two execution modes: a **structured generation pipeline** and an **autonomous goal loop**. Both use specialized agents backed by Ollama and share project output, validation utilities and persistent memory.
+
+### 1. Structured generation pipeline
 
 ```mermaid
 flowchart TD
-    subgraph Phase 1: System Design
-        A[Analyst] --> B[Architect]
-        B --> C[Critic]
-        C --> D[Planner]
-        A & B & C & D --> E[Consensus]
-        E --> F[File Planner]
-        F --> G[(output/file_plan.json)]
-    end
-
-    subgraph Phase 2: Parallel Generation & Healing
-        G --> H[Dependency Wave Scheduler]
-        H --> I1[Coder — File A]
-        H --> I2[Coder — File B]
-        I1 & I2 --> J{Syntax Compiler}
-        J -- Pass --> K[Import Validator]
-        J -- Fail --> L[Fixer Agent]
-        K -- Pass --> M[Test Syntax Check]
-        K -- Fail --> L
-        M -- Pass --> N[Pytest Execution]
-        M -- Fail --> O[Test Regeneration]
-        O --> N
-        N -- Pass --> P[(output/project/)]
-        N -- Fail --> L
-        L -- Retry + Regen Tests --> J
-    end
+  USER["Natural-language project request"] --> CLI["CLI / configuration"]
+  CLI --> ANALYST["Analyst\nrequirements"]
+  ANALYST --> ARCH["Architect\nsystem design"]
+  ARCH --> CRITIC["Critic\nsecurity + design review"]
+  CRITIC --> PLAN["Planner\nimplementation roadmap"]
+  PLAN --> CONS["Consensus\nconsolidated specification"]
+  CONS --> SPEC[("specification.md")]
+  CONS --> FP["File Planner"]
+  FP --> FJSON[("file_plan.json\nfiles + dependencies")]
+  FJSON --> WAVE["Dependency-wave scheduler"]
+  WAVE --> CODER["Parallel Coder agents"]
+  CODER --> COMPILE{"Python syntax check"}
+  COMPILE -->|Fail| FIX["Fixer agent"]
+  COMPILE -->|Pass| IMPORT["Import Validator"]
+  IMPORT -->|Fail| FIX
+  IMPORT -->|Pass| TG["Test Generator"]
+  TG --> TESTSYNTAX["Test syntax validation"]
+  TESTSYNTAX --> PYTEST["Pytest execution"]
+  PYTEST -->|Fail| FIX
+  PYTEST -->|Pass| OUTPUT[("output/project/\nvalidated files")]
+  FIX -->|Retry up to configured limit| COMPILE
+  OUTPUT --> OPT{"--integration enabled?"}
+  OPT -->|Yes| DEPS["Dependency resolution"]
+  DEPS --> RUN["Runtime smoke test"]
+  RUN --> API["FastAPI / Flask endpoint checks"]
+  OPT -->|No| DONE["Generation summary"]
+  API --> DONE
+  OUTPUT --> DONE
 ```
 
-### Phase 1: System Design
+**Design phase:** Analyst, Architect, Critic and Planner run sequentially. Consensus consolidates their outputs into a specification. The File Planner converts that specification into a dependency-aware JSON file plan. The polyglot planner can be selected for multi-language projects.
 
-The design phase uses a linear chain of dependent LLM agents. All LLM calls are MD5-hashed and cached to `output/cache/`.
+**Generation phase:** Files with satisfied dependencies are grouped into waves and generated concurrently using a `ThreadPoolExecutor`. Python files pass through syntax compilation, import validation, generated-test syntax validation and pytest. Failed files enter a bounded Fixer loop; repair history is persisted so later attempts can avoid repeating known failures.
 
-| Agent | Role |
-|---|---|
-| **Analyst** | Extracts functional and non-functional requirements |
-| **Architect** | Proposes system architecture, tech stack, data flow |
-| **Critic** | Reviews for security flaws, scalability gaps, missing components |
-| **Planner** | Synthesizes all of the above into a phased implementation roadmap |
-| **Consensus** | Merges everything into a single final specification |
-| **File Planner** | Translates the spec into a JSON file plan with `depends_on` relationships |
+**Optional integration phase:** `--integration` enables dependency installation into an isolated environment, a runtime startup check and automatic FastAPI/Flask endpoint validation. This phase is opt-in; it is not run by the standard pipeline unless requested.
 
-### Phase 2: Parallel Generation, Testing & Healing
-
-Files whose `depends_on` are all satisfied are generated in parallel using a `ThreadPoolExecutor`. The pipeline for each file:
+### 2. File validation and self-healing loop
 
 ```mermaid
 sequenceDiagram
-    participant Coder
-    participant Compiler
-    participant ImportValidator
-    participant TestSyntaxCheck
-    participant TestGenerator
-    participant Pytest
-    participant Fixer
+  participant C as Coder
+  participant CP as Python Compiler
+  participant IV as Import Validator
+  participant TG as Test Generator
+  participant TS as Test Syntax Check
+  participant PT as Pytest
+  participant F as Fixer
+  participant RH as Repair History
 
-    Coder->>Compiler: Generate source code
-    Compiler-->>Compiler: py_compile syntax check
-    alt Syntax Failed
-        Compiler->>Fixer: SyntaxError
-    else Syntax Passed
-        Compiler->>ImportValidator: Static import analysis
-        alt Imports Failed
-            ImportValidator->>Fixer: ImportError
-        else Imports Passed
-            ImportValidator->>TestGenerator: Generate tests
-            TestGenerator->>TestSyntaxCheck: Validate test file syntax
-            alt Test Syntax Failed
-                TestSyntaxCheck->>TestGenerator: Regenerate (up to 3x)
-            end
-            TestSyntaxCheck->>Pytest: Run pytest
-            alt Tests Failed
-                Pytest->>Fixer: Failure log + delete stale test
-            else Tests Passed
-                Pytest->>File System: Save verified file
-            end
-        end
+  C->>CP: Generate and write source file
+  CP-->>C: Syntax result
+  alt Syntax error
+    CP->>F: Error + current source
+  else Syntax valid
+    CP->>IV: Validate imports
+    alt Imports invalid
+      IV->>F: Import diagnostics
+    else Imports valid
+      IV->>TG: Request unit tests if missing
+      TG->>TS: Write generated tests
+      TS-->>TG: Compile-check (regenerate up to 3 times)
+      TS->>PT: Execute pytest
+      alt Tests fail
+        PT->>F: Failure output
+        F->>RH: Persist repair context
+        RH-->>F: Previous failed attempts
+      else Tests pass
+        PT-->>C: File accepted
+      end
     end
+  end
+  F->>CP: Repaired source (bounded retries)
 ```
 
-#### 🔄 The Stateful Fixer Loop
+The per-file pipeline applies to Python source files. Non-Python files currently bypass this Python-specific compile/import/pytest validation path; language-specific runtime support is handled through the language utilities and optional integration mechanisms.
 
-On any failure the pipeline enters up to **3 repair attempts**:
+### 3. Autonomous goal-driven mode
 
-- The Fixer receives: error type, error log, current code, and full **repair history** of previous failed attempts (preventing hallucination oscillation).
-- Repair history is **persisted to disk** (`output/repair_history/`) so subsequent runs don't repeat known-bad fixes.
-- On `PYTEST_FAILURE`, the stale test file is **deleted and regenerated** before re-running, so a broken test never permanently blocks valid source code.
+Autonomous mode is a separate execution path, enabled with `--autonomous`. It maintains prioritized goals and tasks, selects a registered specialist agent for each task, retrieves relevant project memory, and iterates until the stop condition or iteration limit.
 
----
+```mermaid
+flowchart TD
+  GOAL["User goal"] --> QUEUE["Prioritized goal queue"]
+  QUEUE --> DECOMP["Planner decomposes goal into tasks"]
+  DECOMP --> TQ["Task queue"]
+  TQ --> SELECT["Select next pending task"]
+  SELECT --> AGENT["Dispatch to registered specialist agent"]
+  MEM[("Project memory")] --> CONTEXT["Retrieve relevant context"]
+  CONTEXT --> AGENT
+  AGENT --> RESULT["Execute task"]
+  RESULT --> STATUS{"Task result"}
+  STATUS -->|Success| LEARN["Store decisions / patterns"]
+  STATUS -->|Failure| ERR["Record error / repair knowledge"]
+  LEARN --> CHECK["Update goal + iteration state"]
+  ERR --> CHECK
+  CHECK --> MORE{"Pending tasks / goals?"}
+  MORE -->|Yes| SELECT
+  MORE -->|No, idle threshold reached| PROPOSE["Analyst proposes follow-up goals"]
+  PROPOSE --> QUEUE
+  MORE -->|Stop / max iterations| SUMMARY["Execution summary"]
+```
+
+The autonomous loop has its own task execution and goal lifecycle. It should not be confused with the structured pipeline's dependency-wave file generator. Autonomous mode uses the registered agents directly and can propose follow-up goals when idle.
+
+### 4. Local model runtime, memory and interfaces
+
+```mermaid
+flowchart LR
+  subgraph APP["AgentForge application"]
+    CLI["CLI / pipeline"]
+    AUTO["Autonomous agent"]
+    WEB["Web UI · FastAPI"]
+    CLI --> AGENTS["Specialized agents"]
+    AUTO --> AGENTS
+    WEB --> AUTO
+    AUTO <--> LOCALMEM[("Local project memory\nJSONL + embeddings")]
+  end
+  AGENTS <-->|"local inference"| OLLAMA["Ollama runtime"]
+  OLLAMA --- MODELS["Planner / coder / embedding models"]
+  WEB <-->|"WebSocket status updates"| BROWSER["Browser dashboard"]
+  WEB <-->|"HTTP / WebSocket"| MS["Optional team memory server"]
+  MS <--> TEAMMEM[("Shared project memory\nJSONL files")]
+  DOCKER["Docker Compose"] -. "runs services" .-> OLLAMA
+  DOCKER -.-> WEB
+  DOCKER -.-> MS
+  DOCKER -.-> APP
+```
+
+| Component | Responsibility |
+|---|---|
+| Ollama | Local inference for planner, coder and embedding models |
+| CLI pipeline | Structured design, file planning, generation and validation |
+| Autonomous agent | Goal/task queues, specialist dispatch and iterative execution |
+| Local project memory | Project-scoped JSONL entries with Ollama embeddings and keyword fallback |
+| Web UI | FastAPI dashboard, agent controls and WebSocket status broadcasts |
+| Team memory server | Optional separate FastAPI service for shared project memory and WebSocket synchronization |
+| Docker Compose | Runs Ollama, AgentForge batch job, Web UI and memory server as separate services |
+
+The Web UI and memory server are separate services. The team memory server is an optional shared-memory service; the local autonomous agent's own project memory remains a distinct store. The README's Docker Compose stack starts the batch pipeline, dashboard and memory server alongside Ollama.
+
+### 5. Execution and persistence boundaries
+
+- **LLM calls:** handled through the Ollama-backed agent layer; planner and coder models can be selected independently.
+- **Agent output cache:** stores reusable model responses unless cache reads are disabled.
+- **Generated artifacts:** specification, file plan, generated project and error logs are written beneath the configured output directory.
+- **Repair history:** persisted per generated file under the repair-history directory.
+- **Long-term memory:** project-scoped entries are stored locally with optional vector embeddings; the separate memory server stores shared project entries.
+- **Execution checks:** generated code is compiled and tested through subprocesses with configured timeouts. Optional integration tests execute the generated entry point and probe discovered API routes.
+
 
 ## 🧠 LLM Engine
 
